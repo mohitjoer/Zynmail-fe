@@ -71,12 +71,23 @@ export default function EmailRow({ email, isSelected, onSelect }: { email: Email
 
       {/* Subject and Snippet - Flexible width */}
       <div className="flex-1 min-w-0 flex items-center pr-4">
-        <div className="truncate w-full text-[14px]">
-          <span className={cn(showUnread ? "text-[#202124] font-bold" : "text-[#202124] font-medium")}>
+        <div className="flex items-center w-full text-[14px]">
+          {email.ai_category && (
+            <span className={cn(
+              "px-2 py-[2px] text-[12px] font-medium rounded whitespace-nowrap mr-3 flex-shrink-0",
+              email.ai_category === "Needs Reply" ? "bg-[#e8faee] text-[#1b8b4a]" :
+              email.ai_category === "VIP" ? "bg-[#eae2fa] text-[#693db8]" :
+              email.ai_category === "Linear" ? "bg-[#fae9e1] text-[#c7542d]" :
+              "bg-[#def3fc] text-[#195687]" // Default (Noise, etc)
+            )}>
+              {email.ai_category}
+            </span>
+          )}
+          <span className={cn("truncate shrink", showUnread ? "text-[#202124] font-bold" : "text-[#202124] font-medium")}>
             {email.subject || "(no subject)"}
           </span>
-          <span className="text-[#5f6368] font-normal mx-2">-</span>
-          <span className="text-[#5f6368] font-normal">
+          <span className="text-[#5f6368] font-normal mx-2 shrink-0">-</span>
+          <span className="text-[#5f6368] font-normal truncate">
             {email.snippet}
           </span>
         </div>

@@ -27,6 +27,7 @@ export interface Email {
   attachments: Attachment[];
   thread_id: string | null;
   unsubscribe_link?: string;
+  ai_category?: string;
   timestamp: string;
 }
 

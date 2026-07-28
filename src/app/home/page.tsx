@@ -5,6 +5,7 @@ import Header from "@/components/layout/Header";
 import EmailList from "@/components/email/EmailList";
 import EmailDetail from "@/components/email/EmailDetail";
 import ComposeModal from "@/components/email/ComposeModal";
+import ChatBox from "@/components/chat/ChatBox";
 import { useEmail } from "@/context/EmailContext";
 import { useTheme } from "@/context/ThemeContext";
 import React, { useEffect, useState } from "react";
@@ -93,6 +94,7 @@ export default function Home() {
         </div>
       </div>
       <ComposeModal />
+      <ChatBox />
     </div>
   );
 }
