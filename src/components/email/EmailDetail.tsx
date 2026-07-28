@@ -145,9 +145,9 @@ export default function EmailDetail() {
               <h1 className="text-2xl text-[#202124] font-normal">
                 {e.subject}
               </h1>
-              <Badge variant="secondary" className="text-[10px] uppercase font-medium bg-muted text-[#5f6368] hover:bg-muted py-0 h-5 px-1.5 flex items-center gap-1">
+              <Badge variant="secondary" className="text-[10px] uppercase font-medium bg-muted text-muted-foreground dark:text-white hover:bg-muted py-0 h-5 px-1.5 flex items-center gap-1">
                 Inbox
-                <span className="text-[14px] leading-none mb-[2px] cursor-pointer hover:text-[#202124]">×</span>
+                <span className="text-[14px] leading-none mb-[2px] cursor-pointer hover:text-foreground dark:hover:text-gray-300">×</span>
               </Badge>
             </div>
             <div className="flex gap-1 shrink-0 mt-1">
@@ -223,7 +223,27 @@ export default function EmailDetail() {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : e.body_html ? (
-                <div dangerouslySetInnerHTML={{ __html: e.body_html }} className="w-full email-html-content" />
+                <iframe 
+                  srcDoc={e.body_html} 
+                  sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+                  className="w-full min-h-[600px] border-none bg-white rounded-md"
+                  title="Email content"
+                  onLoad={(e) => {
+                    const iframe = e.currentTarget;
+                    try {
+                      if (iframe.contentWindow) {
+                        iframe.style.height = iframe.contentWindow.document.documentElement.scrollHeight + 50 + 'px';
+                        
+                        // Force links to open in new tab and inject basic body margin if missing
+                        const style = iframe.contentWindow.document.createElement('style');
+                        style.textContent = 'body { margin: 0; padding: 16px; font-family: sans-serif; } a { target: _blank; }';
+                        iframe.contentWindow.document.head.appendChild(style);
+                      }
+                    } catch (err) {
+                      console.error("Iframe load error", err);
+                    }
+                  }}
+                />
               ) : (
                 <div className="whitespace-pre-wrap">{e.body}</div>
               )}

@@ -1,4 +1,4 @@
-import { Menu, Search, SlidersHorizontal, LogOut } from "lucide-react";
+import { Menu, Search, SlidersHorizontal, LogOut, Settings } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -8,16 +8,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 
 export default function Header() {
-  const [user, setUser] = useState<{name: string, avatar_url: string} | null>(null);
+  const [user, setUser] = useState<{name: string, email: string, avatar_url: string, signature: string} | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [signature, setSignature] = useState("");
 
   useEffect(() => {
     fetch('http://localhost:8000/api/user/me')
       .then(res => res.json())
       .then(data => {
-        if (data.name) setUser(data);
+        if (data.name) {
+          setUser(data);
+          setSignature(data.signature || "Sent from Zynmail");
+        }
       })
       .catch(console.error);
   }, []);
@@ -28,6 +43,21 @@ export default function Header() {
       window.location.href = '/onboarding';
     } catch (err) {
       console.error('Logout failed', err);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      await fetch('http://localhost:8000/api/user/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signature })
+      });
+      setUser(prev => prev ? { ...prev, signature } : null);
+      setProfileOpen(false);
+      toast.success("Profile settings saved!");
+    } catch (err) {
+      toast.error("Failed to save profile");
     }
   };
 
@@ -74,6 +104,10 @@ export default function Header() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setProfileOpen(true)} className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Profile Settings</span>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
@@ -82,6 +116,44 @@ export default function Header() {
           </DropdownMenu>
         </div>
       </div>
+
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Profile Settings</DialogTitle>
+            <DialogDescription>
+              Update your account details and email signature.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16">
+                {user?.avatar_url && <AvatarImage src={user.avatar_url} />}
+                <AvatarFallback className="bg-[#006FEE] text-white text-2xl font-medium">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <span className="font-semibold text-lg">{user?.name}</span>
+                <span className="text-sm text-muted-foreground">{user?.email}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 mt-2">
+              <label className="text-sm font-medium">Email Signature</label>
+              <textarea 
+                value={signature}
+                onChange={(e) => setSignature(e.target.value)}
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="Sent from Zynmail"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProfileOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveProfile} className="bg-[#006FEE] hover:bg-[#005bc4] text-white">Save changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
