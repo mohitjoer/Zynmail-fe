@@ -1,5 +1,7 @@
-import { Menu, Search, SlidersHorizontal, LogOut, Settings } from "lucide-react";
+import { Menu, Search, SlidersHorizontal, LogOut, Settings, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useEmail } from "@/context/EmailContext";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +23,7 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 
 export default function Header() {
+  const { isChatOpen, toggleChat } = useEmail();
   const [user, setUser] = useState<{name: string, email: string, avatar_url: string, signature: string} | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [signature, setSignature] = useState("");
@@ -86,8 +89,22 @@ export default function Header() {
       </div>
 
       {/* Right section: Icons and Profile */}
-      <div className="flex items-center gap-1 w-[238px] justify-end pr-2">
-        <div className="pl-2">
+      <div className="flex items-center gap-2 w-[238px] justify-end pr-2">
+        <button
+          onClick={toggleChat}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all shadow-sm cursor-pointer",
+            isChatOpen 
+              ? "bg-blue-600 text-white shadow-blue-500/25 ring-2 ring-blue-400" 
+              : "bg-white/80 hover:bg-white text-gray-700 hover:text-blue-600 backdrop-blur-sm"
+          )}
+          title={isChatOpen ? "Close AI Side Panel" : "Open AI Side Panel"}
+        >
+          <Sparkles className={cn("h-3.5 w-3.5", isChatOpen ? "text-yellow-300 animate-pulse" : "text-blue-600")} />
+          <span className="font-semibold">Ask Zyn</span>
+        </button>
+
+        <div className="pl-1">
           <DropdownMenu>
             <DropdownMenuTrigger className="focus:outline-none rounded-full">
               <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent hover:ring-black/10 transition-all">

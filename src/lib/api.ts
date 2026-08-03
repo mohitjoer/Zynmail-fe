@@ -5,6 +5,9 @@ import type {
   EmailUpdate,
   FolderCounts,
   UserProfile,
+  AutomationRule,
+  AutomationRuleCreate,
+  AutomationLog,
 } from "@/types";
 
 const API_BASE = "";
@@ -78,5 +81,33 @@ export const api = {
 
   user: {
     me: () => fetchAPI<UserProfile>("/api/user/me"),
+  },
+
+  automations: {
+    list: () => fetchAPI<AutomationRule[]>("/api/automations"),
+    create: (data: AutomationRuleCreate) =>
+      fetchAPI<AutomationRule>("/api/automations", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    generate: (prompt: string) =>
+      fetchAPI<Partial<AutomationRuleCreate>>("/api/automations/generate", {
+        method: "POST",
+        body: JSON.stringify({ prompt }),
+      }),
+    update: (id: string, data: Partial<AutomationRuleCreate>) =>
+      fetchAPI<AutomationRule>(`/api/automations/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      fetchAPI<{ message: string }>(`/api/automations/${id}`, {
+        method: "DELETE",
+      }),
+    logs: () => fetchAPI<AutomationLog[]>("/api/automations/logs"),
+    test: (id: string) =>
+      fetchAPI<{ message: string }>(`/api/automations/${id}/test`, {
+        method: "POST",
+      }),
   },
 };

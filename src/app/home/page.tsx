@@ -5,14 +5,25 @@ import Header from "@/components/layout/Header";
 import EmailList from "@/components/email/EmailList";
 import EmailDetail from "@/components/email/EmailDetail";
 import ComposeModal from "@/components/email/ComposeModal";
-import ChatBox from "@/components/chat/ChatBox";
+import ChatSidePanel from "@/components/chat/ChatSidePanel";
+import { AutomationsModal } from "@/components/automations/AutomationsModal";
 import { useEmail } from "@/context/EmailContext";
 import { useTheme } from "@/context/ThemeContext";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
-  const { selectedEmail, refreshEmails, checkAuthStatus, isConnected, isLoading } = useEmail();
+  const {
+    selectedEmail,
+    refreshEmails,
+    checkAuthStatus,
+    isConnected,
+    isLoading,
+    isChatOpen,
+    isAutomationsOpen,
+    setIsAutomationsOpen,
+  } = useEmail();
   const { resolvedTheme } = useTheme();
   const [isSyncing, setIsSyncing] = useState(false);
   const authAttempted = React.useRef(false);
@@ -78,11 +89,11 @@ export default function Home() {
     >
       <Header />
       <div className="flex flex-1 overflow-hidden p-4 pt-2">
-        <div className="flex flex-1 bg-white/90 backdrop-blur-md rounded-2xl overflow-hidden shadow-sm">
+        <div className="flex flex-1 bg-white/90 backdrop-blur-md rounded-2xl overflow-hidden shadow-sm relative">
           <Sidebar />
           
           {/* Main Content Area */}
-          <div className="flex-1 flex flex-col min-w-0 p-2">
+          <div className="flex-1 flex flex-col min-w-0 p-2 transition-all duration-300">
             <div className="flex-1 flex flex-col min-w-0 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               {selectedEmail ? (
                 <EmailDetail />
@@ -91,10 +102,23 @@ export default function Home() {
               )}
             </div>
           </div>
+
+          {/* AI Chat Side Panel */}
+          <div
+            className={cn(
+              "transition-all duration-300 ease-in-out flex flex-col overflow-hidden h-full shrink-0",
+              isChatOpen ? "w-[380px] lg:w-[420px] p-2 pl-0 opacity-100" : "w-0 p-0 opacity-0 pointer-events-none"
+            )}
+          >
+            <ChatSidePanel />
+          </div>
         </div>
       </div>
       <ComposeModal />
-      <ChatBox />
+      <AutomationsModal
+        isOpen={isAutomationsOpen}
+        onClose={() => setIsAutomationsOpen(false)}
+      />
     </div>
   );
 }

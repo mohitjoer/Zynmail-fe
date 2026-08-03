@@ -82,3 +82,49 @@ export type MailFolder =
   | "sent"
   | "drafts"
   | "trash";
+
+export interface AutomationRule {
+  id: string;
+  name: string;
+  description?: string;
+  trigger_type: "ai_condition" | "sender" | "category" | "keyword";
+  trigger_value: string;
+  action_type: "reply" | "forward" | "star" | "tag" | "archive";
+  use_ai_reply: boolean;
+  reply_prompt?: string;
+  reply_template?: string;
+  forward_to?: string;
+  forward_note?: string;
+  tag_name?: string;
+  is_active: boolean;
+  execution_count: number;
+  last_executed_at?: string | null;
+  created_at: string;
+}
+
+export interface AutomationRuleCreate {
+  name: string;
+  description?: string;
+  trigger_type: "ai_condition" | "sender" | "category" | "keyword";
+  trigger_value: string;
+  action_type: "reply" | "forward" | "star" | "tag" | "archive";
+  use_ai_reply?: boolean;
+  reply_prompt?: string;
+  reply_template?: string;
+  forward_to?: string;
+  forward_note?: string;
+  tag_name?: string;
+  is_active?: boolean;
+}
+
+export interface AutomationLog {
+  id: string;
+  rule_id: string;
+  rule_name: string;
+  email_id: string;
+  email_subject: string;
+  email_sender: string;
+  action_executed: string;
+  details?: string;
+  timestamp: string;
+}

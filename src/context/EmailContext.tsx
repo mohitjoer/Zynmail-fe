@@ -36,6 +36,12 @@ interface EmailContextType {
   isConnected: boolean;
   connectGmail: () => void;
   checkAuthStatus: () => Promise<void>;
+  isChatOpen: boolean;
+  setIsChatOpen: (open: boolean) => void;
+  toggleChat: () => void;
+  isAutomationsOpen: boolean;
+  setIsAutomationsOpen: (open: boolean) => void;
+  toggleAutomations: () => void;
 }
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -51,6 +57,16 @@ export function EmailProvider({ children }: { children: ReactNode }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isInitialized, setIsInitialized] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isAutomationsOpen, setIsAutomationsOpen] = useState(false);
+
+  const toggleChat = useCallback(() => {
+    setIsChatOpen(prev => !prev);
+  }, []);
+
+  const toggleAutomations = useCallback(() => {
+    setIsAutomationsOpen(prev => !prev);
+  }, []);
 
   useEffect(() => {
     const validFolders = [
@@ -346,6 +362,12 @@ export function EmailProvider({ children }: { children: ReactNode }) {
         isConnected,
         connectGmail,
         checkAuthStatus,
+        isChatOpen,
+        setIsChatOpen,
+        toggleChat,
+        isAutomationsOpen,
+        setIsAutomationsOpen,
+        toggleAutomations,
       }}
     >
       {children}

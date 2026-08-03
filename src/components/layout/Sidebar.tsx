@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useEmail } from "@/context/EmailContext";
 import { cn } from "@/lib/utils";
 import type { MailFolder } from "@/types";
@@ -22,13 +24,25 @@ import {
   Archive, // Fallback for All Mail
   Mailbox,
   MailSearch,
-  ChevronDown
+  ChevronDown,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 
 export default function Sidebar() {
-  const { activeFolder, setActiveFolder, setComposeOpen, folderCounts } = useEmail();
+  const pathname = usePathname();
+  const router = useRouter();
+  const { activeFolder, setActiveFolder, setComposeOpen, folderCounts, toggleAutomations } = useEmail();
   const [isExpanded, setIsExpanded] = useState(true);
+
+  const isAutomationsActive = pathname === "/automations";
+
+  const handleFolderClick = (folderId: MailFolder) => {
+    setActiveFolder(folderId);
+    if (pathname !== "/home") {
+      router.push("/home");
+    }
+  };
 
   const mainNavItems = [
     { title: "Inbox", id: "inbox", icon: Inbox, count: folderCounts["inbox_unread"] || folderCounts["inbox"] },
@@ -46,39 +60,42 @@ export default function Sidebar() {
     { title: "Bin", id: "trash", icon: Trash2, count: folderCounts["trash"] },
   ];
 
-  const renderNavItem = (item: any, isNested: boolean = false) => (
-    <button
-      key={item.id}
-      onClick={() => {
-        if (!item.isAction) setActiveFolder(item.id as MailFolder);
-      }}
-      className={cn(
-        "w-full flex items-center justify-between py-[7px] rounded-r-full text-[14px] transition-colors",
-        isNested ? "pl-12 pr-6" : "px-6",
-        activeFolder === item.id 
-          ? "bg-white/60 text-[#202124] font-bold shadow-sm"
-          : "text-[#202124] hover:bg-white/40"
-      )}
-    >
-      <div className="flex items-center gap-4">
-        <item.icon 
-          className={cn(
-            "h-5 w-5", 
-            activeFolder === item.id ? "text-[#202124] fill-current opacity-80" : "text-[#5f6368]"
-          )} 
-          strokeWidth={activeFolder === item.id ? 2.5 : 2} 
-        />
-        <span className={activeFolder === item.id ? "font-bold text-[15px]" : "font-normal text-[15px]"}>
-          {item.title}
-        </span>
-      </div>
-      {item.count > 0 && (
-        <span className={cn("text-xs", activeFolder === item.id ? "font-bold text-[#202124]" : "font-medium text-[#5f6368]")}>
-          {item.count}
-        </span>
-      )}
-    </button>
-  );
+  const renderNavItem = (item: any, isNested: boolean = false) => {
+    const isActive = !isAutomationsActive && activeFolder === item.id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => {
+          if (!item.isAction) handleFolderClick(item.id as MailFolder);
+        }}
+        className={cn(
+          "w-full flex items-center justify-between py-[7px] rounded-r-full text-[14px] transition-colors cursor-pointer",
+          isNested ? "pl-12 pr-6" : "px-6",
+          isActive 
+            ? "bg-white/60 text-[#202124] font-bold shadow-sm"
+            : "text-[#202124] hover:bg-white/40"
+        )}
+      >
+        <div className="flex items-center gap-4">
+          <item.icon 
+            className={cn(
+              "h-5 w-5", 
+              isActive ? "text-[#202124] fill-current opacity-80" : "text-[#5f6368]"
+            )} 
+            strokeWidth={isActive ? 2.5 : 2} 
+          />
+          <span className={isActive ? "font-bold text-[15px]" : "font-normal text-[15px]"}>
+            {item.title}
+          </span>
+        </div>
+        {item.count > 0 && (
+          <span className={cn("text-xs", isActive ? "font-bold text-[#202124]" : "font-medium text-[#5f6368]")}>
+            {item.count}
+          </span>
+        )}
+      </button>
+    );
+  };
 
   return (
     <div className="w-[256px] shrink-0 flex flex-col h-full bg-transparent pt-4 pb-4">
@@ -96,6 +113,25 @@ export default function Sidebar() {
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto no-scrollbar space-y-0 pr-4 mt-2">
         {mainNavItems.map(item => renderNavItem(item))}
+
+        {/* Automations Nav Item */}
+        <Link
+          href="/automations"
+          className={cn(
+            "w-full flex items-center justify-between px-6 py-[7px] rounded-r-full text-[14px] transition-colors group cursor-pointer",
+            isAutomationsActive
+              ? "bg-white/60 text-[#202124] font-bold shadow-sm"
+              : "text-[#202124] hover:bg-white/40 font-normal"
+          )}
+        >
+          <div className="flex items-center gap-4">
+            <Zap className={cn("h-5 w-5 text-orange-500 group-hover:scale-110 transition-transform", isAutomationsActive ? "fill-orange-500" : "")} strokeWidth={2.2} />
+            <span className={cn("text-[15px]", isAutomationsActive ? "font-bold text-[#202124]" : "font-normal text-[#202124]")}>Automations</span>
+          </div>
+          <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-orange-500/15 text-orange-600 border border-orange-500/20">
+            AI
+          </span>
+        </Link>
 
         {/* Toggle Button */}
         <button
