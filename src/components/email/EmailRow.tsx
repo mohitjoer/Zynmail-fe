@@ -74,11 +74,14 @@ export default function EmailRow({ email, isSelected, onSelect }: { email: Email
         <div className="flex items-center w-full text-[14px]">
           {email.ai_category && (
             <span className={cn(
-              "px-2 py-[2px] text-[12px] font-medium rounded whitespace-nowrap mr-3 flex-shrink-0",
-              email.ai_category === "Needs Reply" ? "bg-[#e8faee] text-[#1b8b4a]" :
-              email.ai_category === "VIP" ? "bg-[#eae2fa] text-[#693db8]" :
-              email.ai_category === "Linear" ? "bg-[#fae9e1] text-[#c7542d]" :
-              "bg-[#def3fc] text-[#195687]" // Default (Noise, etc)
+              "w-[86px] h-[22px] inline-flex items-center justify-center text-[11.5px] font-medium rounded whitespace-nowrap mr-3 shrink-0 text-center select-none",
+              email.ai_category.toLowerCase() === "verification" ? "bg-[#fef3c7] text-[#92400e] border border-amber-200/70" :
+              email.ai_category.toLowerCase() === "social" ? "bg-[#e0e7ff] text-[#4338ca] border border-indigo-200/70" :
+              email.ai_category.toLowerCase() === "promotions" || email.ai_category.toLowerCase() === "promotion" ? "bg-[#fce7f3] text-[#9d174d] border border-pink-200/70" :
+              email.ai_category.toLowerCase() === "needs reply" ? "bg-[#e8faee] text-[#1b8b4a] border border-emerald-200/70" :
+              email.ai_category.toLowerCase() === "vip" ? "bg-[#eae2fa] text-[#693db8] border border-purple-200/70" :
+              email.ai_category.toLowerCase() === "linear" ? "bg-[#fae9e1] text-[#c7542d] border border-orange-200/70" :
+              "bg-[#def3fc] text-[#195687] border border-blue-200/70" // Default
             )}>
               {email.ai_category}
             </span>
