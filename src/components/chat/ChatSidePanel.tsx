@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useEmail } from "@/context/EmailContext";
 import { cn } from "@/lib/utils";
+import { FormattedMessage } from "@/components/chat/FormattedMessage";
 
 interface Message {
   role: "user" | "assistant";
@@ -217,7 +218,10 @@ export default function ChatSidePanel() {
                     : "bg-[#f8fafc] text-gray-800 rounded-tl-sm border border-gray-100"
                 )}
               >
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+                <FormattedMessage
+                  content={msg.content}
+                  isUser={msg.role === "user"}
+                />
               </div>
 
               {/* Message metadata & actions */}

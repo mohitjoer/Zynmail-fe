@@ -100,6 +100,8 @@ export interface AutomationRule {
   execution_count: number;
   last_executed_at?: string | null;
   created_at: string;
+  graph_nodes?: any[];
+  graph_edges?: any[];
 }
 
 export interface AutomationRuleCreate {
@@ -115,6 +117,8 @@ export interface AutomationRuleCreate {
   forward_note?: string;
   tag_name?: string;
   is_active?: boolean;
+  graph_nodes?: any[];
+  graph_edges?: any[];
 }
 
 export interface AutomationLog {

@@ -83,35 +83,30 @@ export default function Home() {
 
   return (
     <div
-      className="flex flex-col h-screen w-full text-[#1f1f1f] overflow-hidden font-sans"
-      style={{ backgroundImage: "url('/background.jpg')", backgroundSize: 'cover', backgroundPosition: 'center' }}
+      className="flex flex-col h-screen w-full text-[#1f1f1f] overflow-hidden font-sans bg-[#f8fafc]"
       suppressHydrationWarning
     >
       <Header />
-      <div className="flex flex-1 overflow-hidden p-4 pt-2">
-        <div className="flex flex-1 bg-white/90 backdrop-blur-md rounded-2xl overflow-hidden shadow-sm relative">
-          <Sidebar />
-          
-          {/* Main Content Area */}
-          <div className="flex-1 flex flex-col min-w-0 p-2 transition-all duration-300">
-            <div className="flex-1 flex flex-col min-w-0 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              {selectedEmail ? (
-                <EmailDetail />
-              ) : (
-                <EmailList />
-              )}
-            </div>
-          </div>
+      <div className="flex flex-1 overflow-hidden relative">
+        <Sidebar />
+        
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 bg-white overflow-hidden">
+          {selectedEmail ? (
+            <EmailDetail />
+          ) : (
+            <EmailList />
+          )}
+        </div>
 
-          {/* AI Chat Side Panel */}
-          <div
-            className={cn(
-              "transition-all duration-300 ease-in-out flex flex-col overflow-hidden h-full shrink-0",
-              isChatOpen ? "w-[380px] lg:w-[420px] p-2 pl-0 opacity-100" : "w-0 p-0 opacity-0 pointer-events-none"
-            )}
-          >
-            <ChatSidePanel />
-          </div>
+        {/* AI Chat Side Panel */}
+        <div
+          className={cn(
+            "transition-all duration-300 ease-in-out flex flex-col overflow-hidden h-full shrink-0 border-l border-gray-200 bg-white",
+            isChatOpen ? "w-[380px] lg:w-[420px] opacity-100" : "w-0 opacity-0 pointer-events-none"
+          )}
+        >
+          <ChatSidePanel />
         </div>
       </div>
       <ComposeModal />

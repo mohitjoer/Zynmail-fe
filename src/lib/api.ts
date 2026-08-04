@@ -95,6 +95,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ prompt }),
       }),
+    chatBuild: (data: { message: string; current_workflow?: any; graph_nodes?: any[]; graph_edges?: any[]; history?: any[] }) =>
+      fetchAPI<{ message: string; workflow?: any; graph_nodes: any[]; graph_edges: any[]; suggested_actions: string[]; needs_clarification: boolean }>("/api/automations/chat-build", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     update: (id: string, data: Partial<AutomationRuleCreate>) =>
       fetchAPI<AutomationRule>(`/api/automations/${id}`, {
         method: "PUT",

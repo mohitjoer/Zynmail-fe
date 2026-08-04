@@ -1,6 +1,7 @@
 import { Menu, Search, SlidersHorizontal, LogOut, Settings, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEmail } from "@/context/EmailContext";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -23,10 +24,13 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 
 export default function Header() {
+  const pathname = usePathname();
   const { isChatOpen, toggleChat } = useEmail();
   const [user, setUser] = useState<{name: string, email: string, avatar_url: string, signature: string} | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [signature, setSignature] = useState("");
+
+  const isSolidPage = pathname === "/automations";
 
   useEffect(() => {
     fetch('http://localhost:8000/api/user/me')
@@ -65,10 +69,12 @@ export default function Header() {
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 w-full h-[64px] bg-transparent shrink-0">
+    <div className="flex items-center justify-between px-4 py-2 w-full h-[64px] shrink-0 z-30 bg-white border-b border-gray-200 shadow-2xs">
       {/* Left section: Hamburger and Logo */}
       <div className="flex items-center gap-3 w-[238px] pl-2">
-        <span className="text-[24px] text-white font-bold tracking-tight px-3 drop-shadow-sm">Zynmail</span>
+        <span className="text-[24px] font-bold tracking-tight px-3 text-[#202124]">
+          Zynmail
+        </span>
       </div>
 
       {/* Middle section: Search Bar */}

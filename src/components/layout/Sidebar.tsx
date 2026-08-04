@@ -72,15 +72,15 @@ export default function Sidebar() {
           "w-full flex items-center justify-between py-[7px] rounded-r-full text-[14px] transition-colors cursor-pointer",
           isNested ? "pl-12 pr-6" : "px-6",
           isActive 
-            ? "bg-white/60 text-[#202124] font-bold shadow-sm"
-            : "text-[#202124] hover:bg-white/40"
+            ? "bg-[#d3e3fd] text-[#041e49] font-bold"
+            : "text-[#444746] hover:bg-gray-200/60 hover:text-[#202124]"
         )}
       >
         <div className="flex items-center gap-4">
           <item.icon 
             className={cn(
               "h-5 w-5", 
-              isActive ? "text-[#202124] fill-current opacity-80" : "text-[#5f6368]"
+              isActive ? "text-[#041e49] fill-current opacity-90" : "text-[#5f6368]"
             )} 
             strokeWidth={isActive ? 2.5 : 2} 
           />
@@ -89,7 +89,7 @@ export default function Sidebar() {
           </span>
         </div>
         {item.count > 0 && (
-          <span className={cn("text-xs", isActive ? "font-bold text-[#202124]" : "font-medium text-[#5f6368]")}>
+          <span className={cn("text-xs font-semibold", isActive ? "text-[#041e49]" : "text-[#5f6368]")}>
             {item.count}
           </span>
         )}
@@ -98,12 +98,12 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-[256px] shrink-0 flex flex-col h-full bg-transparent pt-4 pb-4">
+    <div className="w-[240px] xl:w-[256px] shrink-0 flex flex-col h-full bg-[#f8fafc] border-r border-gray-200 pt-4 pb-4">
       {/* New Email Button */}
       <div className="px-4 mb-4">
         <button
           onClick={() => setComposeOpen(true)}
-          className="w-[145px] h-14 bg-white hover:bg-gray-50 text-[#3c4043] rounded-2xl flex items-center gap-4 px-4 shadow-sm border border-gray-200 transition-all ml-1"
+          className="w-[145px] h-14 bg-white hover:bg-gray-50 text-[#3c4043] rounded-2xl flex items-center gap-4 px-4 shadow-xs border border-gray-200 transition-all ml-1 cursor-pointer"
         >
           <Pencil className="h-[22px] w-[22px] text-[#5f6368] fill-current" strokeWidth={1.5} />
           <span className="text-[15px] font-medium tracking-wide">Compose</span>
@@ -120,16 +120,16 @@ export default function Sidebar() {
           className={cn(
             "w-full flex items-center justify-between px-6 py-[7px] rounded-r-full text-[14px] transition-colors group cursor-pointer",
             isAutomationsActive
-              ? "bg-white/60 text-[#202124] font-bold shadow-sm"
-              : "text-[#202124] hover:bg-white/40 font-normal"
+              ? "bg-orange-100/70 text-orange-900 font-bold border-l-3 border-orange-500"
+              : "text-[#444746] hover:bg-gray-200/60 hover:text-[#202124] font-normal"
           )}
         >
           <div className="flex items-center gap-4">
             <Zap className={cn("h-5 w-5 text-orange-500 group-hover:scale-110 transition-transform", isAutomationsActive ? "fill-orange-500" : "")} strokeWidth={2.2} />
-            <span className={cn("text-[15px]", isAutomationsActive ? "font-bold text-[#202124]" : "font-normal text-[#202124]")}>Automations</span>
+            <span className={cn("text-[15px]", isAutomationsActive ? "font-bold text-orange-900" : "font-normal text-[#202124]")}>Automations</span>
           </div>
-          <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-orange-500/15 text-orange-600 border border-orange-500/20">
-            AI
+          <span className="px-1.5 py-0.2 text-[9px] font-bold uppercase rounded bg-orange-200 text-orange-800">
+            Studio
           </span>
         </Link>
 
