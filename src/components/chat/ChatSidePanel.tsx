@@ -89,7 +89,7 @@ export default function ChatSidePanel() {
         });
       }
 
-      const response = await fetch("http://localhost:8000/api/chat", {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: payloadMessages })
@@ -146,33 +146,33 @@ export default function ChatSidePanel() {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden select-text">
+    <div className="flex flex-col h-full bg-card rounded-2xl shadow-sm border border-border overflow-hidden select-text">
       {/* Side Panel Header */}
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 bg-gradient-to-r from-blue-50/50 via-indigo-50/30 to-white shrink-0">
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-border bg-gradient-to-r from-blue-50/10 via-indigo-50/10 to-card dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-card shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm text-gray-900 leading-none">Zyn AI Assistant</h3>
+              <h3 className="font-semibold text-sm text-foreground leading-none">Zyn AI Assistant</h3>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">Llama 3.1</span>
             </div>
-            <p className="text-[11px] text-gray-500 mt-0.5">Your email & inbox copilot</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Your email &amp; inbox copilot</p>
           </div>
         </div>
 
         <div className="flex items-center gap-1">
           <button
             onClick={handleResetChat}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
             title="Reset conversation"
           >
             <RotateCcw className="h-4 w-4" />
           </button>
           <button
             onClick={() => setIsChatOpen(false)}
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
             title="Close side panel"
           >
             <X className="h-4 w-4" />
@@ -215,7 +215,7 @@ export default function ChatSidePanel() {
                   "rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed shadow-sm break-words",
                   msg.role === "user"
                     ? "bg-blue-600 text-white rounded-tr-sm"
-                    : "bg-[#f8fafc] text-gray-800 rounded-tl-sm border border-gray-100"
+                    : "bg-muted text-foreground rounded-tl-sm border border-border"
                 )}
               >
                 <FormattedMessage
@@ -226,7 +226,7 @@ export default function ChatSidePanel() {
 
               {/* Message metadata & actions */}
               <div className={cn(
-                "flex items-center gap-2 mt-1 px-1 text-[11px] text-gray-400",
+                "flex items-center gap-2 mt-1 px-1 text-[11px] text-muted-foreground",
                 msg.role === "user" ? "justify-end" : "justify-start"
               )}>
                 {msg.timestamp && <span>{msg.timestamp}</span>}
@@ -247,7 +247,7 @@ export default function ChatSidePanel() {
             </div>
 
             {msg.role === "user" && (
-              <div className="h-7 w-7 rounded-xl bg-gray-200 text-gray-600 flex items-center justify-center shrink-0 mt-0.5">
+              <div className="h-7 w-7 rounded-xl bg-muted text-muted-foreground flex items-center justify-center shrink-0 mt-0.5">
                 <User className="h-4 w-4" />
               </div>
             )}
@@ -259,8 +259,8 @@ export default function ChatSidePanel() {
             <div className="h-7 w-7 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
               <Bot className="h-4 w-4" />
             </div>
-            <div className="bg-[#f8fafc] rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5 shadow-sm border border-gray-100">
-              <span className="text-xs text-gray-500 font-medium mr-1">Zyn is thinking</span>
+            <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5 shadow-sm border border-border">
+              <span className="text-xs text-muted-foreground font-medium mr-1">Zyn is thinking</span>
               <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
               <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
               <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></span>
@@ -271,7 +271,7 @@ export default function ChatSidePanel() {
         {/* Suggestion Chips */}
         {messages.length <= 2 && !isLoading && (
           <div className="pt-2">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Suggested Prompts</p>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">Suggested Prompts</p>
             <div className="flex flex-col gap-1.5">
               {quickPrompts
                 .filter(p => !p.showIfSelected || selectedEmail)
@@ -279,7 +279,7 @@ export default function ChatSidePanel() {
                   <button
                     key={i}
                     onClick={() => handleSend(p.prompt)}
-                    className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 hover:bg-blue-50/80 hover:text-blue-700 text-gray-700 text-xs text-left border border-gray-100 hover:border-blue-200 transition-all group"
+                    className="flex items-center justify-between px-3 py-2 rounded-xl bg-muted hover:bg-blue-50/80 dark:hover:bg-blue-950/30 hover:text-blue-700 text-foreground text-xs text-left border border-border hover:border-blue-200 transition-all group"
                   >
                     <div className="flex items-center gap-2">
                       <p.icon className="h-3.5 w-3.5 text-gray-400 group-hover:text-blue-600 shrink-0" />
@@ -296,8 +296,8 @@ export default function ChatSidePanel() {
       </div>
 
       {/* Input Bottom Bar */}
-      <div className="p-3 bg-gray-50/80 border-t border-gray-100 shrink-0">
-        <div className="relative flex items-center bg-white rounded-xl border border-gray-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all shadow-sm">
+      <div className="p-3 bg-muted/50 border-t border-border shrink-0">
+        <div className="relative flex items-center bg-card rounded-xl border border-border focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all shadow-sm">
           <textarea
             ref={inputRef}
             rows={1}
@@ -310,7 +310,7 @@ export default function ChatSidePanel() {
               }
             }}
             placeholder={selectedEmail ? "Ask about this email or inbox..." : "Ask Zyn anything..."}
-            className="w-full bg-transparent border-none rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none resize-none max-h-28"
+            className="w-full bg-transparent border-none rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none resize-none max-h-28"
           />
           <button
             onClick={() => handleSend()}
@@ -325,7 +325,7 @@ export default function ChatSidePanel() {
             <Send className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="flex items-center justify-between px-1 mt-1.5 text-[10px] text-gray-400">
+        <div className="flex items-center justify-between px-1 mt-1.5 text-[10px] text-muted-foreground">
           <span>Press Enter ↵ to send</span>
           <span className="flex items-center gap-1">
             <ShieldCheck className="h-3 w-3 text-blue-500" />

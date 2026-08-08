@@ -1,11 +1,13 @@
-import { Menu, Search, SlidersHorizontal, LogOut, Settings, Sparkles } from "lucide-react";
+import { LogOut, Settings, Sparkles, Pencil, Sun, Moon, RefreshCw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEmail } from "@/context/EmailContext";
-import { usePathname } from "next/navigation";
+import { useTheme } from "@/context/ThemeContext";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -22,44 +24,71 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 
 export default function Header() {
   const pathname = usePathname();
-  const { isChatOpen, toggleChat } = useEmail();
+  const router = useRouter();
+  const { isChatOpen, toggleChat, setComposeOpen, isConnected, connectGmail, refreshEmails } = useEmail();
+  const { resolvedTheme, toggleTheme } = useTheme();
   const [user, setUser] = useState<{name: string, email: string, avatar_url: string, signature: string} | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [signature, setSignature] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const isSolidPage = pathname === "/automations";
+  const handleSync = async () => {
+    if (!isConnected) {
+      connectGmail();
+      return;
+    }
+    setIsSyncing(true);
+    toast.info("Syncing latest emails from Gmail...");
+    try {
+      await refreshEmails();
+      toast.success("Inbox synced!");
+    } catch (err) {
+      toast.error("Failed to sync emails");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/user/me')
-      .then(res => res.json())
+    let isMounted = true;
+    api.user.me()
       .then(data => {
-        if (data.name) {
-          setUser(data);
+        if (isMounted && data && data.name) {
+          setUser({
+            name: data.name,
+            email: data.email || "",
+            avatar_url: data.avatar_url || "",
+            signature: data.signature || "Sent from Zynmail"
+          });
           setSignature(data.signature || "Sent from Zynmail");
         }
       })
-      .catch(console.error);
+      .catch(err => {
+        // Silently handle initial network fetch fallback
+        console.debug("User profile fetch notice:", err);
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:8000/api/auth/logout', { method: 'POST' });
-      window.location.href = '/onboarding';
+      await api.auth.logout();
+      window.location.href = '/signin';
     } catch (err) {
       console.error('Logout failed', err);
+      window.location.href = '/signin';
     }
   };
 
   const handleSaveProfile = async () => {
     try {
-      await fetch('http://localhost:8000/api/user/me', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signature })
-      });
+      await api.user.update({ signature });
       setUser(prev => prev ? { ...prev, signature } : null);
       setProfileOpen(false);
       toast.success("Profile settings saved!");
@@ -69,67 +98,95 @@ export default function Header() {
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 w-full h-[64px] shrink-0 z-30 bg-white border-b border-gray-200 shadow-2xs">
-      {/* Left section: Hamburger and Logo */}
+    <div className="flex items-center justify-between px-4 py-2 w-full h-[64px] shrink-0 z-30 bg-card border-b border-border shadow-2xs">
+      {/* Left section: Logo and Compose */}
       <div className="flex items-center gap-3 w-[238px] pl-2">
-        <span className="text-[24px] font-bold tracking-tight px-3 text-[#202124]">
+        <span className="text-[22px] font-bold tracking-tight px-3 text-foreground">
           Zynmail
         </span>
-      </div>
-
-      {/* Middle section: Search Bar */}
-      <div className="flex-1 max-w-[720px] px-2">
-        <div className="flex items-center bg-[#f0f4f9]/90 backdrop-blur-sm focus-within:bg-white focus-within:shadow-md transition-all rounded-full px-4 h-12 w-full">
-          <button className="p-2 text-[#444746] rounded-full hover:bg-black/5">
-            <Search className="h-5 w-5" />
-          </button>
-          <input 
-            type="text" 
-            placeholder="Search mail" 
-            className="flex-1 bg-transparent border-none focus:outline-none px-2 text-[#1f1f1f] text-base placeholder:text-[#444746]"
-          />
-          <button className="p-2 text-[#444746] rounded-full hover:bg-black/5">
-            <SlidersHorizontal className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Right section: Icons and Profile */}
-      <div className="flex items-center gap-2 w-[238px] justify-end pr-2">
         <button
-          onClick={toggleChat}
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all shadow-sm cursor-pointer",
-            isChatOpen 
-              ? "bg-blue-600 text-white shadow-blue-500/25 ring-2 ring-blue-400" 
-              : "bg-white/80 hover:bg-white text-gray-700 hover:text-blue-600 backdrop-blur-sm"
-          )}
-          title={isChatOpen ? "Close AI Side Panel" : "Open AI Side Panel"}
+          onClick={() => setComposeOpen(true)}
+          className="flex items-center gap-2 px-3 py-1.5 bg-background hover:bg-muted text-foreground rounded-full border border-border shadow-xs transition-all cursor-pointer text-[13px] font-medium whitespace-nowrap"
         >
-          <Sparkles className={cn("h-3.5 w-3.5", isChatOpen ? "text-yellow-300 animate-pulse" : "text-blue-600")} />
-          <span className="font-semibold">Ask Zyn</span>
+          <Pencil className="h-[14px] w-[14px] text-muted-foreground fill-current shrink-0" strokeWidth={1.5} />
+          Compose
+        </button>
+      </div>
+
+
+      {/* Right section: Sync, Theme toggle, Ask Zyn, Profile */}
+      <div className="flex items-center gap-2 justify-end pr-2">
+        {!isConnected ? (
+          <button
+            onClick={connectGmail}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all cursor-pointer"
+          >
+            Connect Gmail
+          </button>
+        ) : (
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+            title="Sync latest emails from Gmail"
+          >
+            <RefreshCw className={cn("h-[16px] w-[16px]", isSyncing && "animate-spin text-blue-500")} />
+          </button>
+        )}
+
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          title={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {resolvedTheme === 'dark' ? (
+            <Sun className="h-[18px] w-[18px]" />
+          ) : (
+            <Moon className="h-[18px] w-[18px]" />
+          )}
         </button>
 
+        {/* Ask Zyn - Hidden on Settings page */}
+        {!pathname?.startsWith("/settings") && (
+          <button
+            onClick={toggleChat}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all shadow-sm cursor-pointer",
+              isChatOpen
+                ? "bg-blue-600 text-white shadow-blue-500/25 ring-2 ring-blue-400"
+                : "bg-card hover:bg-muted text-foreground border border-border"
+            )}
+            title={isChatOpen ? "Close AI Side Panel" : "Open AI Side Panel"}
+          >
+            <Sparkles className={cn("h-3.5 w-3.5", isChatOpen ? "text-yellow-300 animate-pulse" : "text-blue-500")} />
+            <span className="font-semibold">Ask Zyn</span>
+          </button>
+        )}
+
+        {/* Profile Dropdown */}
         <div className="pl-1">
           <DropdownMenu>
             <DropdownMenuTrigger className="focus:outline-none rounded-full">
-              <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent hover:ring-black/10 transition-all">
-                {user?.avatar_url && <AvatarImage src={user.avatar_url} alt={user.name} />}
-                <AvatarFallback className="bg-[#006FEE] text-white text-sm font-medium">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : "You"}
+              <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent hover:ring-border transition-all">
+                {user?.avatar_url && <AvatarImage src={user.avatar_url} alt={user.name} referrerPolicy="no-referrer" />}
+                <AvatarFallback className="bg-blue-600 text-white text-sm font-medium">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : "Y"}
                 </AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.name || 'My Account'}</p>
-                </div>
-              </DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user?.name || 'My Account'}</p>
+                  </div>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setProfileOpen(true)} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => router.push("/settings")} className="cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
-                <span>Profile Settings</span>
+                <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950">
                 <LogOut className="mr-2 h-4 w-4" />
@@ -152,7 +209,7 @@ export default function Header() {
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
                 {user?.avatar_url && <AvatarImage src={user.avatar_url} />}
-                <AvatarFallback className="bg-[#006FEE] text-white text-2xl font-medium">
+                <AvatarFallback className="bg-blue-600 text-white text-2xl font-medium">
                   {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
                 </AvatarFallback>
               </Avatar>
@@ -163,7 +220,7 @@ export default function Header() {
             </div>
             <div className="flex flex-col gap-2 mt-2">
               <label className="text-sm font-medium">Email Signature</label>
-              <textarea 
+              <textarea
                 value={signature}
                 onChange={(e) => setSignature(e.target.value)}
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -173,7 +230,7 @@ export default function Header() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProfileOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveProfile} className="bg-[#006FEE] hover:bg-[#005bc4] text-white">Save changes</Button>
+            <Button onClick={handleSaveProfile} className="bg-blue-600 hover:bg-blue-700 text-white">Save changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -43,7 +43,14 @@ function toRecipientObjects(rawList: string[]) {
 }
 
 export default function ComposeModal() {
-  const { composeOpen, setComposeOpen, refreshEmails } = useEmail();
+  const {
+    composeOpen,
+    setComposeOpen,
+    draftToEdit,
+    setDraftToEdit,
+    refreshEmails,
+    deleteEmail,
+  } = useEmail();
 
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
@@ -54,6 +61,7 @@ export default function ComposeModal() {
   const [body, setBody] = useState("");
 
   const [isSending, setIsSending] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,15 +69,24 @@ export default function ComposeModal() {
 
   const toInputRef = useRef<HTMLInputElement>(null);
 
+  // Initialize or populate with draft data when opened
   useEffect(() => {
     if (composeOpen) {
-      // reset transient UI state each time the composer is (re)opened
       setError(null);
       setTouched(false);
+
+      if (draftToEdit) {
+        setTo(draftToEdit.to?.map((t) => t.email || t.name).join(", ") || "");
+        setCc(draftToEdit.cc?.map((c) => c.email || c.name).join(", ") || "");
+        setShowCc(Boolean(draftToEdit.cc && draftToEdit.cc.length > 0));
+        setSubject(draftToEdit.subject || "");
+        setBody(draftToEdit.body || "");
+      }
+
       const id = requestAnimationFrame(() => toInputRef.current?.focus());
       return () => cancelAnimationFrame(id);
     }
-  }, [composeOpen]);
+  }, [composeOpen, draftToEdit]);
 
   if (!composeOpen) return null;
 
@@ -87,9 +104,61 @@ export default function ComposeModal() {
     setBody("");
     setError(null);
     setTouched(false);
+    setDraftToEdit(null);
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
+    // If there is meaningful draft content, save/update as draft before closing
+    const hasContent = to.trim() || subject.trim() || body.trim();
+    if (hasContent) {
+      try {
+        setIsSavingDraft(true);
+        if (draftToEdit?.id) {
+          await api.emails.update(draftToEdit.id, {
+            to: toRecipientObjects(recipients),
+            cc: toRecipientObjects(parseRecipients(cc)),
+            bcc: toRecipientObjects(parseRecipients(bcc)),
+            subject: subject.trim() || "(no subject)",
+            body,
+            folder: "drafts",
+            labels: ["DRAFT"],
+          });
+        } else {
+          await api.emails.create({
+            to: toRecipientObjects(recipients),
+            cc: toRecipientObjects(parseRecipients(cc)),
+            bcc: toRecipientObjects(parseRecipients(bcc)),
+            subject: subject.trim() || "(no subject)",
+            body,
+            body_html: "",
+            is_draft: true,
+            thread_id: draftToEdit?.thread_id || null,
+            in_reply_to: draftToEdit?.in_reply_to || null,
+          });
+        }
+        refreshEmails();
+      } catch (err) {
+        console.error("Failed to auto-save draft:", err);
+      } finally {
+        setIsSavingDraft(false);
+      }
+    }
+
+    resetForm();
+    setComposeOpen(false);
+    setIsFullscreen(false);
+    setIsMinimized(false);
+  };
+
+  const handleDiscard = async () => {
+    if (draftToEdit?.id) {
+      try {
+        await deleteEmail(draftToEdit.id);
+        refreshEmails();
+      } catch (err) {
+        console.error("Failed to discard draft:", err);
+      }
+    }
     resetForm();
     setComposeOpen(false);
     setIsFullscreen(false);
@@ -123,7 +192,19 @@ export default function ComposeModal() {
         body,
         body_html: "",
         is_draft: false,
+        thread_id: draftToEdit?.thread_id || null,
+        in_reply_to: draftToEdit?.in_reply_to || null,
       });
+
+      // If we were editing a draft, delete the old draft record
+      if (draftToEdit?.id) {
+        try {
+          await api.emails.delete(draftToEdit.id);
+        } catch {
+          // Non-blocking if already sent
+        }
+      }
+
       resetForm();
       setComposeOpen(false);
       refreshEmails();
@@ -163,7 +244,7 @@ export default function ComposeModal() {
     <div
       className="fixed bottom-0 right-6 z-50 animate-in slide-in-from-bottom-4 duration-300"
       role="dialog"
-      aria-label="New message"
+      aria-label={draftToEdit ? "Edit draft" : "New message"}
       onKeyDown={handleKeyDown}
     >
       <div
@@ -176,9 +257,16 @@ export default function ComposeModal() {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 bg-[#f2f6fc] dark:bg-muted border-b border-transparent shrink-0">
-          <span className="text-[14px] font-medium text-slate-800 dark:text-slate-200 truncate">
-            {subject.trim() || "New Message"}
-          </span>
+          <div className="flex items-center gap-2 truncate">
+            <span className="text-[14px] font-medium text-slate-800 dark:text-slate-200 truncate">
+              {draftToEdit ? (subject.trim() || "Edit Draft") : (subject.trim() || "New Message")}
+            </span>
+            {isSavingDraft && (
+              <span className="text-[11px] text-muted-foreground animate-pulse">
+                Saving…
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
@@ -384,7 +472,8 @@ export default function ComposeModal() {
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
-                onClick={handleClose}
+                onClick={handleDiscard}
+                title="Discard draft"
                 aria-label="Discard draft"
               >
                 <Trash2 className="h-5 w-5" />

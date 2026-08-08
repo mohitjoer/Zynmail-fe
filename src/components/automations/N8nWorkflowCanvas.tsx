@@ -220,22 +220,28 @@ function WorkflowConnectionLine({
 interface N8nWorkflowCanvasProps {
   initialNodes?: WorkflowNode[];
   initialConnections?: WorkflowConnection[];
+  nodes?: WorkflowNode[];
+  connections?: WorkflowConnection[];
   selectedNodeId?: string | null;
   onSelectNode?: (nodeId: string) => void;
   onAddNode?: (node: WorkflowNode) => void;
-  onAlignNodesRef?: React.MutableRefObject<(() => void) | null>;
-  onAddNodeRef?: React.MutableRefObject<(() => void) | null>;
+  onAlignNodesRef?: React.MutableRefObject<(() => void) | null> | React.RefObject<(() => void) | null>;
+  onAddNodeRef?: React.MutableRefObject<(() => void) | null> | React.RefObject<(() => void) | null>;
 }
 
 export function N8nWorkflowCanvas({
-  initialNodes: propNodes,
-  initialConnections: propConnections,
+  initialNodes,
+  initialConnections,
+  nodes: propNodesAlias,
+  connections: propConnectionsAlias,
   selectedNodeId,
   onSelectNode,
   onAddNode,
   onAlignNodesRef,
   onAddNodeRef,
 }: N8nWorkflowCanvasProps) {
+  const propNodes = propNodesAlias ?? initialNodes;
+  const propConnections = propConnectionsAlias ?? initialConnections;
   const defaultNodes: WorkflowNode[] = [
     {
       id: "node_trigger_mail",
@@ -524,7 +530,7 @@ export function N8nWorkflowCanvas({
   };
 
   return (
-    <div className="relative w-full h-full flex flex-col overflow-hidden bg-slate-50/50 select-none">
+    <div className="relative w-full h-full flex flex-col overflow-hidden bg-muted/20 dark:bg-background/40 select-none">
       {/* SVG Filters & Gradient Definitions */}
       <svg className="sr-only" aria-hidden="true">
         <defs>
@@ -664,7 +670,7 @@ export function N8nWorkflowCanvas({
                       </div>
 
                       {node.metrics && (
-                        <span className="text-[10px] font-mono font-medium text-slate-400 shrink-0">
+                        <span className="text-[10px] font-mono font-medium text-muted-foreground shrink-0">
                           {node.metrics}
                         </span>
                       )}
@@ -672,15 +678,15 @@ export function N8nWorkflowCanvas({
 
                     {/* Title */}
                     <div>
-                      <h4 className="text-xs font-bold tracking-tight text-slate-900 truncate">
+                      <h4 className="text-xs font-bold tracking-tight text-foreground truncate">
                         {node.title}
                       </h4>
                     </div>
 
                     {/* PROMPT / LOGIC BOX EMBEDDED DIRECTLY IN NODE */}
                     {(node.prompt || node.description) && (
-                      <div className="rounded-xl bg-slate-50/90 border border-slate-200/70 p-2 text-[11px] space-y-1">
-                        <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                      <div className="rounded-xl bg-muted border border-border p-2 text-[11px] space-y-1">
+                        <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                           <Sparkles className="h-2.5 w-2.5 text-indigo-500 shrink-0" />
                           <span>
                             {node.type === "trigger"
@@ -692,17 +698,17 @@ export function N8nWorkflowCanvas({
                               : "Instructions"}
                           </span>
                         </div>
-                        <p className="line-clamp-3 text-slate-700 font-sans text-[11px] leading-relaxed break-words">
+                        <p className="line-clamp-3 text-foreground font-sans text-[11px] leading-relaxed break-words">
                           {node.prompt || node.description}
                         </p>
                       </div>
                     )}
 
                     {/* Footer Affordance */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[10px]">
-                      <div className="flex items-center gap-1.5 text-slate-400">
+                    <div className="flex items-center justify-between pt-2 border-t border-border text-[10px]">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+                        <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
                           Step Validated
                         </span>
                       </div>
@@ -728,46 +734,46 @@ export function N8nWorkflowCanvas({
       {/* Floating Canvas Dock / Quick Controls */}
       <div className="absolute bottom-5 right-6 flex items-center gap-2 z-20">
         {/* Node & Wire Telemetry Badge */}
-        <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-white/90 backdrop-blur-md border border-slate-200/80 shadow-sm text-xs text-slate-600 font-medium">
+        <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-card/90 backdrop-blur-md border border-border shadow-sm text-xs text-muted-foreground font-medium">
           <div className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-slate-800 font-semibold">{nodes.length}</span>
-            <span className="text-slate-400">nodes</span>
+            <span className="text-foreground font-semibold">{nodes.length}</span>
+            <span className="text-muted-foreground">nodes</span>
           </div>
-          <span className="text-slate-200">|</span>
+          <span className="text-border">|</span>
           <div className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-indigo-500" />
-            <span className="text-slate-800 font-semibold">{connections.length}</span>
-            <span className="text-slate-400">wires</span>
+            <span className="text-foreground font-semibold">{connections.length}</span>
+            <span className="text-muted-foreground">wires</span>
           </div>
         </div>
 
         {/* Zoom & Fit Toolbar */}
-        <div className="flex items-center rounded-xl bg-white/90 backdrop-blur-md border border-slate-200/80 shadow-sm p-0.5">
+        <div className="flex items-center rounded-xl bg-card/90 backdrop-blur-md border border-border shadow-sm p-0.5">
           <button
             onClick={() => handleZoom(-10)}
-            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition cursor-pointer"
             title="Zoom Out"
           >
             <ZoomOut className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={handleResetZoom}
-            className="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 rounded-md transition cursor-pointer"
+            className="px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground rounded-md transition cursor-pointer"
             title="Reset Zoom & Align"
           >
             {zoomLevel}%
           </button>
           <button
             onClick={() => handleZoom(10)}
-            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition cursor-pointer"
             title="Zoom In"
           >
             <ZoomIn className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={handleAlignNodes}
-            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition cursor-pointer border-l border-slate-100"
+            className="p-1.5 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-lg transition cursor-pointer border-l border-border"
             title="Auto Align Nodes"
           >
             <RotateCcw className="h-3.5 w-3.5" />

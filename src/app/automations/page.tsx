@@ -77,6 +77,18 @@ export default function AutomationsPage() {
   // Active Drawers / Modals
   const [showRulesDrawer, setShowRulesDrawer] = useState(false);
   const [showLogsDrawer, setShowLogsDrawer] = useState(false);
+  const [showTestDrawer, setShowTestDrawer] = useState(false);
+
+  // Simulation / Test State
+  const [simulating, setSimulating] = useState(false);
+  const [selectedTestEmailId, setSelectedTestEmailId] = useState<string>("latest");
+  const [customTestSender, setCustomTestSender] = useState("invoices@stripe.com");
+  const [customTestSubject, setCustomTestSubject] = useState("Your monthly invoice #1092");
+  const [customTestBody, setCustomTestBody] = useState("Hi there, your Pro plan monthly subscription of $29.00 USD has been received. Thank you!");
+  const [simulationResult, setSimulationResult] = useState<any | null>(null);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchResult, setBatchResult] = useState<any | null>(null);
+  const [liveExecuteToggle, setLiveExecuteToggle] = useState(false);
 
   // Selected Node in Canvas for Inspector
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -316,6 +328,80 @@ export default function AutomationsPage() {
     }
   };
 
+  // Helper to compile the active canvas state into an AutomationRuleCreate payload
+  const getWorkflowPayload = (): AutomationRuleCreate => {
+    const triggerNode = canvasWorkflowNodes.find((n) => n.type === "trigger");
+    const evaluatorNode = canvasWorkflowNodes.find((n) => n.type === "evaluator");
+    const actionNodes = canvasWorkflowNodes.filter((n) => n.type === "action");
+    const primaryAction = actionNodes[0];
+
+    const resolvedName =
+      (workflowSpec.name && workflowSpec.name !== "New Workflow" ? workflowSpec.name : null) ||
+      (ruleName && ruleName !== "New Workflow" ? ruleName : null) ||
+      (primaryAction ? `${primaryAction.title} Workflow` : "Custom Automation Workflow");
+
+    const resolvedDescription =
+      workflowSpec.description ||
+      ruleDescription ||
+      evaluatorNode?.prompt ||
+      evaluatorNode?.description ||
+      "Custom LangGraph email automation workflow";
+
+    const resolvedTriggerValue =
+      workflowSpec.trigger_value ||
+      triggerNode?.prompt ||
+      triggerNode?.description ||
+      evaluatorNode?.prompt ||
+      "All incoming emails";
+
+    const isForward = canvasWorkflowNodes.some(
+      (n) => n.id.includes("forward") || n.title.toLowerCase().includes("forward")
+    );
+    const isTag = canvasWorkflowNodes.some(
+      (n) => n.id.includes("tag") || n.title.toLowerCase().includes("tag")
+    );
+
+    const resolvedActionType =
+      workflowSpec.action_type ||
+      (isForward ? "forward" : isTag ? "tag" : "reply");
+
+    const resolvedReplyPrompt =
+      workflowSpec.reply_prompt ||
+      primaryAction?.prompt ||
+      primaryAction?.description ||
+      "Politely acknowledge receipt of the email.";
+
+    return {
+      name: resolvedName,
+      description: resolvedDescription,
+      trigger_type: workflowSpec.trigger_type || "ai_condition",
+      trigger_value: resolvedTriggerValue,
+      action_type: resolvedActionType,
+      use_ai_reply: workflowSpec.use_ai_reply ?? true,
+      reply_prompt: resolvedReplyPrompt,
+      reply_template: workflowSpec.reply_template || "",
+      forward_to: workflowSpec.forward_to || "",
+      forward_note: workflowSpec.forward_note || "",
+      tag_name: workflowSpec.tag_name || "",
+      is_active: isActive,
+      graph_nodes: canvasWorkflowNodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        description: n.description,
+        prompt: n.prompt || n.description,
+        color: n.color,
+        badge: n.badge,
+        metrics: n.metrics,
+        position: n.position,
+      })),
+      graph_edges: canvasWorkflowConnections.map((c) => ({
+        from: c.from,
+        to: c.to,
+      })),
+    };
+  };
+
   // Save / Deploy Workflow
   const handleSaveWorkflow = async () => {
     // If only root node is present or no action nodes
@@ -326,78 +412,7 @@ export default function AutomationsPage() {
 
     try {
       setSaving(true);
-
-      // Intelligent derivation of rule parameters if workflowSpec is incomplete
-      const triggerNode = canvasWorkflowNodes.find((n) => n.type === "trigger");
-      const evaluatorNode = canvasWorkflowNodes.find((n) => n.type === "evaluator");
-      const actionNodes = canvasWorkflowNodes.filter((n) => n.type === "action");
-      const primaryAction = actionNodes[0];
-
-      const resolvedName =
-        (workflowSpec.name && workflowSpec.name !== "New Workflow" ? workflowSpec.name : null) ||
-        (ruleName && ruleName !== "New Workflow" ? ruleName : null) ||
-        (primaryAction ? `${primaryAction.title} Workflow` : "Custom Automation Workflow");
-
-      const resolvedDescription =
-        workflowSpec.description ||
-        ruleDescription ||
-        evaluatorNode?.prompt ||
-        evaluatorNode?.description ||
-        "Custom LangGraph email automation workflow";
-
-      const resolvedTriggerValue =
-        workflowSpec.trigger_value ||
-        triggerNode?.prompt ||
-        triggerNode?.description ||
-        evaluatorNode?.prompt ||
-        "All incoming emails";
-
-      const isForward = canvasWorkflowNodes.some(
-        (n) => n.id.includes("forward") || n.title.toLowerCase().includes("forward")
-      );
-      const isTag = canvasWorkflowNodes.some(
-        (n) => n.id.includes("tag") || n.title.toLowerCase().includes("tag")
-      );
-
-      const resolvedActionType =
-        workflowSpec.action_type ||
-        (isForward ? "forward" : isTag ? "tag" : "reply");
-
-      const resolvedReplyPrompt =
-        workflowSpec.reply_prompt ||
-        primaryAction?.prompt ||
-        primaryAction?.description ||
-        "Politely acknowledge receipt of the email.";
-
-      const payload: AutomationRuleCreate = {
-        name: resolvedName,
-        description: resolvedDescription,
-        trigger_type: workflowSpec.trigger_type || "ai_condition",
-        trigger_value: resolvedTriggerValue,
-        action_type: resolvedActionType,
-        use_ai_reply: workflowSpec.use_ai_reply ?? true,
-        reply_prompt: resolvedReplyPrompt,
-        reply_template: workflowSpec.reply_template || "",
-        forward_to: workflowSpec.forward_to || "",
-        forward_note: workflowSpec.forward_note || "",
-        tag_name: workflowSpec.tag_name || "",
-        is_active: isActive,
-        graph_nodes: canvasWorkflowNodes.map((n) => ({
-          id: n.id,
-          type: n.type,
-          title: n.title,
-          description: n.description,
-          prompt: n.prompt || n.description,
-          color: n.color,
-          badge: n.badge,
-          metrics: n.metrics,
-          position: n.position,
-        })),
-        graph_edges: canvasWorkflowConnections.map((c) => ({
-          from: c.from,
-          to: c.to,
-        })),
-      };
+      const payload = getWorkflowPayload();
 
       if (currentRuleId) {
         const updated = await api.automations.update(currentRuleId, payload);
@@ -417,9 +432,9 @@ export default function AutomationsPage() {
         {
           id: `bot-save-${Date.now()}`,
           role: "assistant",
-          content: `✅ **"${resolvedName}"** has been saved and activated! Incoming emails matching this criteria will now automatically run through this workflow.`,
+          content: `✅ **"${payload.name}"** has been saved and activated! Incoming emails matching this criteria will now automatically run through this workflow.`,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          suggestedActions: ["View Activity Logs", "Build another workflow"],
+          suggestedActions: ["Test & Simulate Flow", "View Activity Logs", "Build another workflow"],
         },
       ]);
     } catch (err: any) {
@@ -427,6 +442,72 @@ export default function AutomationsPage() {
       toast.error(err?.message || "Failed to save workflow");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Test / Simulate Workflow Execution
+  const handleRunSimulation = async () => {
+    try {
+      setSimulating(true);
+      setSimulationResult(null);
+      const payload = getWorkflowPayload();
+
+      let emailIdToSend: string | undefined = undefined;
+      let customEmailToSend: any = undefined;
+
+      if (selectedTestEmailId === "custom") {
+        customEmailToSend = {
+          from: { name: customTestSender || "Sender", email: customTestSender || "sender@example.com" },
+          subject: customTestSubject || "Sample Subject",
+          body: customTestBody || "Sample email body content.",
+          snippet: customTestBody || "Sample email body content.",
+          folder: "inbox",
+        };
+      } else if (selectedTestEmailId !== "latest") {
+        emailIdToSend = selectedTestEmailId;
+      }
+
+      const res = await api.automations.simulate({
+        rule_id: currentRuleId || undefined,
+        rule_data: payload,
+        email_id: emailIdToSend,
+        custom_email: customEmailToSend,
+        live_execute: liveExecuteToggle,
+      });
+
+      setSimulationResult(res);
+      if (res.matched) {
+        toast.success(liveExecuteToggle ? "🚀 Workflow executed on email!" : "✨ Workflow criteria matched!");
+      } else {
+        toast.info("ℹ️ Email did not match workflow criteria");
+      }
+    } catch (err: any) {
+      console.error("Simulation error:", err);
+      toast.error(err?.message || "Failed to run simulation");
+    } finally {
+      setSimulating(false);
+    }
+  };
+
+  // Batch run workflow on user's recent inbox emails
+  const handleRunBatchInbox = async (ruleIdToRun?: string) => {
+    const targetId = ruleIdToRun || currentRuleId;
+    if (!targetId) {
+      toast.error("Please save the workflow first to run it over your inbox");
+      return;
+    }
+    try {
+      setBatchRunning(true);
+      setBatchResult(null);
+      const res = await api.automations.runInbox(targetId, 20);
+      setBatchResult(res);
+      toast.success(`Processed inbox: ${res.matched_count} matching emails executed!`);
+      loadData(); // reload activity logs
+    } catch (err: any) {
+      console.error("Batch inbox error:", err);
+      toast.error(err?.message || "Failed to run workflow on inbox");
+    } finally {
+      setBatchRunning(false);
     }
   };
 
@@ -581,7 +662,7 @@ export default function AutomationsPage() {
 
   return (
     <div
-      className="flex flex-col h-screen w-full text-slate-900 overflow-hidden font-sans bg-[#f8fafc]"
+      className="flex flex-col h-screen w-full text-foreground overflow-hidden font-sans bg-background"
       suppressHydrationWarning
     >
       {/* Top Main Application Header */}
@@ -593,11 +674,11 @@ export default function AutomationsPage() {
         <Sidebar />
 
         {/* Studio Center Workspace */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 bg-card overflow-hidden">
           {/* ========================================================= */}
           {/* UNIFIED STUDIO TOOLBAR (Ultra-Clean Single Header) */}
           {/* ========================================================= */}
-          <div className="px-6 py-3 border-b border-slate-200/90 bg-white flex items-center justify-between gap-4 shrink-0 z-20">
+          <div className="px-6 py-3 border-b border-border bg-card flex items-center justify-between gap-4 shrink-0 z-20">
             {/* Left: Workflow Title & Status */}
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-xs shrink-0">
@@ -614,16 +695,16 @@ export default function AutomationsPage() {
                       onBlur={() => setIsEditingTitle(false)}
                       onKeyDown={(e) => e.key === "Enter" && setIsEditingTitle(false)}
                       autoFocus
-                      className="text-sm font-bold text-slate-900 border-b border-indigo-500 outline-none px-1 bg-transparent"
+                      className="text-sm font-bold text-foreground border-b border-indigo-500 outline-none px-1 bg-transparent"
                     />
                   ) : (
                     <h2
                       onClick={() => setIsEditingTitle(true)}
-                      className="text-sm font-bold text-slate-900 truncate hover:text-indigo-600 transition cursor-pointer flex items-center gap-1.5 group"
+                      className="text-sm font-bold text-foreground truncate hover:text-indigo-600 transition cursor-pointer flex items-center gap-1.5 group"
                       title="Click to rename workflow"
                     >
                       <span>{ruleName}</span>
-                      <Edit3 className="h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Edit3 className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </h2>
                   )}
 
@@ -651,7 +732,7 @@ export default function AutomationsPage() {
                   </span>
                 </div>
 
-                <p className="text-[11px] text-slate-500 truncate mt-0.5 max-w-[400px]">
+                <p className="text-[11px] text-muted-foreground truncate mt-0.5 max-w-[400px]">
                   {ruleDescription}
                 </p>
               </div>
@@ -661,36 +742,46 @@ export default function AutomationsPage() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => alignNodesRef.current?.()}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition shadow-2xs cursor-pointer active:scale-[0.98]"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-border bg-card hover:bg-muted text-foreground transition shadow-2xs cursor-pointer active:scale-[0.98]"
                 title="Auto-align canvas nodes"
               >
-                <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
+                <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>Auto Align</span>
               </button>
 
               <button
                 onClick={() => addNodeRef.current?.()}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition shadow-2xs cursor-pointer active:scale-[0.98]"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-border bg-card hover:bg-muted text-foreground transition shadow-2xs cursor-pointer active:scale-[0.98]"
                 title="Add step to pipeline"
               >
-                <Plus className="h-3.5 w-3.5 text-slate-500" />
+                <Plus className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>Add Step</span>
               </button>
 
               <button
                 onClick={handleResetWorkflow}
-                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl border border-slate-200 transition cursor-pointer"
+                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl border border-border transition cursor-pointer"
                 title="New Blank Workflow"
               >
                 <Plus className="h-4 w-4" />
               </button>
 
+              {/* Test & Simulate Button */}
+              <button
+                onClick={() => setShowTestDrawer(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition shadow-2xs cursor-pointer active:scale-[0.98]"
+                title="Test & Simulate Workflow Live"
+              >
+                <Play className="h-3.5 w-3.5 fill-current" />
+                <span>Test Flow</span>
+              </button>
+
               <button
                 onClick={() => setShowLogsDrawer(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition shadow-2xs cursor-pointer active:scale-[0.98]"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-border bg-card hover:bg-muted text-foreground transition shadow-2xs cursor-pointer active:scale-[0.98]"
                 title="View Activity Logs"
               >
-                <History className="h-3.5 w-3.5 text-slate-500" />
+                <History className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>Activity</span>
               </button>
 
@@ -719,18 +810,18 @@ export default function AutomationsPage() {
           {/* ========================================================= */}
           <div className="flex flex-1 min-w-0 overflow-hidden relative">
             {/* LEFT PANE: AI Workflow Architect Chat */}
-            <div className="w-[390px] xl:w-[440px] flex flex-col border-r border-slate-200/90 bg-white shrink-0 z-10">
+            <div className="w-[390px] xl:w-[440px] flex flex-col border-r border-border bg-card shrink-0 z-10">
               {/* Chat Header */}
-              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="px-5 py-3 border-b border-border flex items-center justify-between bg-muted/30">
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100">
                     <Sparkles className="h-3.5 w-3.5" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900">
+                    <h3 className="text-xs font-bold text-foreground">
                       AI Workflow Architect
                     </h3>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-[10px] text-muted-foreground">
                       Chat to design & compile DAG flow
                     </p>
                   </div>
@@ -738,7 +829,7 @@ export default function AutomationsPage() {
 
                 <button
                   onClick={() => setShowRulesDrawer(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/70 transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted border border-border transition cursor-pointer"
                 >
                   <FolderOpen className="h-3 w-3 text-slate-500" />
                   <span>Workflows ({rules.length})</span>
@@ -760,7 +851,7 @@ export default function AutomationsPage() {
                       className={cn(
                         "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg shadow-2xs",
                         msg.role === "user"
-                          ? "bg-slate-900 text-white"
+                          ? "bg-foreground text-background"
                           : "bg-gradient-to-br from-indigo-500 to-purple-600 text-white"
                       )}
                     >
@@ -783,7 +874,7 @@ export default function AutomationsPage() {
                           "p-3 rounded-2xl",
                           msg.role === "user"
                             ? "bg-indigo-600 text-white rounded-tr-xs"
-                            : "bg-slate-50 text-slate-800 border border-slate-200/80 rounded-tl-xs shadow-2xs"
+                            : "bg-muted text-foreground border border-border rounded-tl-xs shadow-2xs"
                         )}
                       >
                         <FormattedMessage
@@ -799,7 +890,7 @@ export default function AutomationsPage() {
                             <button
                               key={i}
                               onClick={() => handleChatSubmit(action)}
-                              className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1"
+                              className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-card hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-foreground hover:text-indigo-700 border border-border hover:border-indigo-200 shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1"
                             >
                               <Sparkles className="h-2.5 w-2.5 text-indigo-500" />
                               <span>{action}</span>
@@ -817,7 +908,7 @@ export default function AutomationsPage() {
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-2xs">
                       <Bot className="h-3.5 w-3.5 animate-pulse" />
                     </div>
-                    <div className="p-3 px-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-600 flex items-center gap-2">
+                    <div className="p-3 px-4 rounded-2xl bg-muted border border-border text-muted-foreground flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
                       <span className="text-xs font-medium">
                         Designing workflow...
@@ -830,13 +921,13 @@ export default function AutomationsPage() {
               </div>
 
               {/* Chat Input Container */}
-              <div className="p-3.5 border-t border-slate-200/90 bg-white">
+              <div className="p-3.5 border-t border-border bg-card">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     handleChatSubmit();
                   }}
-                  className="relative rounded-2xl border border-slate-200/90 bg-slate-50/50 p-1.5 focus-within:border-indigo-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all shadow-2xs"
+                  className="relative rounded-2xl border border-border bg-muted/30 p-1.5 focus-within:border-indigo-500 focus-within:bg-card focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all shadow-2xs"
                 >
                   <textarea
                     rows={2}
@@ -849,10 +940,10 @@ export default function AutomationsPage() {
                       }
                     }}
                     placeholder="Describe your workflow (e.g. 'When an invoice arrives, forward to accounting and reply')..."
-                    className="w-full resize-none bg-transparent px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                    className="w-full resize-none bg-transparent px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
                   />
 
-                  <div className="flex items-center justify-between px-2 pt-1 border-t border-slate-100/80 text-[10px] text-slate-400">
+                  <div className="flex items-center justify-between px-2 pt-1 border-t border-border/50 text-[10px] text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Sparkles className="h-3 w-3 text-indigo-500" />
                       <span>AI Powered Workflow Studio</span>
@@ -871,7 +962,7 @@ export default function AutomationsPage() {
             </div>
 
             {/* RIGHT PANE: Interactive Drag & Connect Canvas + Slide-over Inspector */}
-            <div className="flex-1 flex relative overflow-hidden bg-slate-50/50">
+            <div className="flex-1 flex relative overflow-hidden bg-muted/30 dark:bg-background/50">
               <N8nWorkflowCanvas
                 nodes={canvasWorkflowNodes}
                 connections={canvasWorkflowConnections}
@@ -888,37 +979,37 @@ export default function AutomationsPage() {
                 const Icon = activeNode.icon || Cpu;
 
                 return (
-                  <div className="w-[340px] xl:w-[370px] border-l border-slate-200 bg-white/95 backdrop-blur-md flex flex-col h-full shadow-lg z-30 animate-in slide-in-from-right-4 duration-200">
+                  <div className="w-[340px] xl:w-[370px] border-l border-border bg-card/95 backdrop-blur-md flex flex-col h-full shadow-lg z-30 animate-in slide-in-from-right-4 duration-200">
                     {/* Inspector Header */}
-                    <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <div className="px-5 py-3.5 border-b border-border flex items-center justify-between bg-muted/30">
                       <div className="flex items-center gap-2 min-w-0">
                         <SlidersHorizontal className="h-4 w-4 text-indigo-600 shrink-0" />
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 truncate">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
                           Step Settings
                         </h4>
                       </div>
                       <button
                         onClick={() => setSelectedNodeId(null)}
-                        className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                        className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition cursor-pointer"
                       >
                         <X className="h-4 w-4" />
                       </button>
                     </div>
 
                     {/* Inspector Body */}
-                    <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs text-slate-700">
+                    <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs text-foreground">
                       {/* Node Header Card */}
-                      <div className="p-3.5 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/70 border border-slate-200/80 space-y-2">
+                      <div className="p-3.5 rounded-2xl bg-muted border border-border space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2.5">
-                            <div className="p-2 rounded-xl bg-white border border-slate-200 shadow-2xs text-slate-700">
+                            <div className="p-2 rounded-xl bg-card border border-border shadow-2xs text-foreground">
                               <Icon className="h-4 w-4 text-indigo-600" />
                             </div>
                             <div>
-                              <span className="font-mono text-[10px] text-slate-400 block uppercase">
+                              <span className="font-mono text-[10px] text-muted-foreground block uppercase">
                                 {activeNode.type} Step
                               </span>
-                              <h5 className="font-bold text-slate-900 text-xs">
+                              <h5 className="font-bold text-foreground text-xs">
                                 {activeNode.title}
                               </h5>
                             </div>
@@ -930,7 +1021,7 @@ export default function AutomationsPage() {
                           )}
                         </div>
                         {activeNode.metrics && (
-                          <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[10px] text-slate-500 font-mono">
+                          <div className="flex items-center justify-between pt-1 border-t border-border/60 text-[10px] text-muted-foreground font-mono">
                             <span>Status: Active</span>
                             <span className="text-emerald-600 font-semibold">{activeNode.metrics}</span>
                           </div>
@@ -939,20 +1030,20 @@ export default function AutomationsPage() {
 
                       {/* Title Edit */}
                       <div className="space-y-1.5">
-                        <label className="block text-[11px] font-bold text-slate-900">
+                        <label className="block text-[11px] font-bold text-foreground">
                           Step Title:
                         </label>
                         <input
                           type="text"
                           value={activeNode.title}
                           onChange={(e) => updateSelectedNode({ title: e.target.value })}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-hidden transition"
+                          className="w-full px-3 py-2 rounded-xl border border-border bg-card text-xs font-semibold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-hidden transition"
                         />
                       </div>
 
                       {/* Description / Prompt Edit */}
                       <div className="space-y-1.5">
-                        <label className="block text-[11px] font-bold text-slate-900">
+                        <label className="block text-[11px] font-bold text-foreground">
                           {activeNode.type === "trigger"
                             ? "Trigger Condition / Criteria:"
                             : activeNode.type === "evaluator"
@@ -965,10 +1056,10 @@ export default function AutomationsPage() {
                           rows={4}
                           value={activeNode.prompt || activeNode.description || ""}
                           onChange={(e) => updateSelectedNode({ prompt: e.target.value, description: e.target.value })}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs leading-relaxed focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-hidden transition resize-none"
+                          className="w-full px-3 py-2 rounded-xl border border-border bg-card text-xs leading-relaxed focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-hidden transition resize-none"
                           placeholder="Enter instructions or criteria..."
                         />
-                        <p className="text-[10px] text-slate-400">
+                        <p className="text-[10px] text-muted-foreground">
                           Directly updates how this step executes in the workflow.
                         </p>
                       </div>
@@ -1002,8 +1093,8 @@ export default function AutomationsPage() {
                       )}
 
                       {/* Color Theme Selector */}
-                      <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                        <label className="block text-[11px] font-bold text-slate-900">
+                      <div className="space-y-1.5 pt-2 border-t border-border">
+                        <label className="block text-[11px] font-bold text-foreground">
                           Node Theme Color:
                         </label>
                         <div className="grid grid-cols-4 gap-1.5">
@@ -1015,8 +1106,8 @@ export default function AutomationsPage() {
                               className={cn(
                                 "py-1.5 px-2 rounded-xl text-[10px] font-bold capitalize border transition cursor-pointer text-center",
                                 activeNode.color === color
-                                  ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
-                                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                                  ? "bg-foreground text-background border-foreground shadow-2xs"
+                                  : "bg-muted border-border text-muted-foreground hover:bg-muted/80"
                               )}
                             >
                               {color}
@@ -1027,7 +1118,7 @@ export default function AutomationsPage() {
 
                       {/* Delete Node (if not root trigger) */}
                       {activeNode.id !== "node_trigger_mail" && (
-                        <div className="pt-3 border-t border-slate-100">
+                        <div className="pt-3 border-t border-border">
                           <button
                             type="button"
                             onClick={deleteSelectedNode}
@@ -1052,17 +1143,17 @@ export default function AutomationsPage() {
       {/* ========================================================= */}
       {showRulesDrawer && (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/30 backdrop-blur-xs animate-in fade-in-50">
-          <div className="w-[420px] bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="w-[420px] bg-card h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/30">
               <div className="flex items-center gap-2">
                 <FolderOpen className="h-4 w-4 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm font-bold text-foreground">
                   Saved Workflows ({rules.length})
                 </h3>
               </div>
               <button
                 onClick={() => setShowRulesDrawer(false)}
-                className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1079,7 +1170,7 @@ export default function AutomationsPage() {
                   <div
                     key={rule.id}
                     onClick={() => handleSelectRule(rule)}
-                    className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer space-y-2 group"
+                    className="p-4 rounded-2xl border border-border bg-card hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer space-y-2 group"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 min-w-0">
@@ -1089,30 +1180,48 @@ export default function AutomationsPage() {
                             rule.is_active ? "bg-emerald-500" : "bg-slate-300"
                           )}
                         />
-                        <h4 className="text-xs font-bold text-slate-900 truncate">
+                        <h4 className="text-xs font-bold text-foreground truncate">
                           {rule.name}
                         </h4>
                       </div>
-                      <button
-                        onClick={(e) => handleDeleteRule(rule.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRunBatchInbox(rule.id);
+                          }}
+                          className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                          title="Run this workflow over recent inbox emails"
+                        >
+                          <Play className="h-3.5 w-3.5 fill-current" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteRule(rule.id, e)}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                          title="Delete workflow"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     {rule.description && (
-                      <p className="text-[11px] text-slate-500 line-clamp-1">
+                      <p className="text-[11px] text-muted-foreground line-clamp-1">
                         {rule.description}
                       </p>
                     )}
 
-                    <div className="flex items-center gap-2 pt-1 text-[10px]">
-                      <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100">
-                        {rule.trigger_type}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100">
-                        {rule.action_type}
+                    <div className="flex items-center justify-between pt-1 text-[10px]">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100">
+                          {rule.trigger_type}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100">
+                          {rule.action_type}
+                        </span>
+                      </div>
+                      <span className="text-slate-400 font-mono">
+                        Runs: {rule.execution_count || 0}
                       </span>
                     </div>
                   </div>
@@ -1128,17 +1237,17 @@ export default function AutomationsPage() {
       {/* ========================================================= */}
       {showLogsDrawer && (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/30 backdrop-blur-xs animate-in fade-in-50">
-          <div className="w-[460px] bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="w-[460px] bg-card h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/30">
               <div className="flex items-center gap-2">
                 <History className="h-4 w-4 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm font-bold text-foreground">
                   Workflow Execution History
                 </h3>
               </div>
               <button
                 onClick={() => setShowLogsDrawer(false)}
-                className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1154,7 +1263,7 @@ export default function AutomationsPage() {
                 logs.map((log) => (
                   <div
                     key={log.id}
-                    className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1.5 text-xs text-slate-800"
+                    className="p-3.5 rounded-2xl border border-border bg-muted/50 space-y-1.5 text-xs text-foreground"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-indigo-600">{log.rule_name}</span>
@@ -1162,10 +1271,10 @@ export default function AutomationsPage() {
                         {log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : "Just now"}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600">
+                    <p className="text-[11px] text-muted-foreground">
                       Evaluated: &ldquo;{log.email_subject}&rdquo; from {log.email_sender}
                     </p>
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px]">
+                    <div className="flex items-center justify-between pt-1 border-t border-border text-[10px]">
                       <span
                         className={cn(
                           "font-semibold uppercase tracking-wider",
@@ -1178,6 +1287,327 @@ export default function AutomationsPage() {
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* WORKFLOW TEST & SIMULATION DRAWER (Slide-over) */}
+      {/* ========================================================= */}
+      {showTestDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-xs animate-in fade-in-50">
+          <div className="w-[520px] max-w-full bg-card h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 border-l border-border">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/30">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                  <Play className="h-4 w-4 fill-current" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">
+                    Workflow Test & Simulation
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Simulate real-time trigger evaluation & action execution
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTestDrawer(false)}
+                className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Test Email Selection */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-foreground">
+                  Select Email to Test Against:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTestEmailId("latest")}
+                    className={cn(
+                      "py-2 px-3 rounded-xl text-xs font-bold border transition text-center cursor-pointer",
+                      selectedTestEmailId === "latest"
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                        : "bg-muted border-border text-muted-foreground hover:bg-muted/80"
+                    )}
+                  >
+                    Latest Inbox Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTestEmailId("select")}
+                    className={cn(
+                      "py-2 px-3 rounded-xl text-xs font-bold border transition text-center cursor-pointer",
+                      selectedTestEmailId === "select" || (selectedTestEmailId !== "latest" && selectedTestEmailId !== "custom")
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                        : "bg-muted border-border text-muted-foreground hover:bg-muted/80"
+                    )}
+                  >
+                    Inbox Dropdown
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTestEmailId("custom")}
+                    className={cn(
+                      "py-2 px-3 rounded-xl text-xs font-bold border transition text-center cursor-pointer",
+                      selectedTestEmailId === "custom"
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                        : "bg-muted border-border text-muted-foreground hover:bg-muted/80"
+                    )}
+                  >
+                    Custom Sample
+                  </button>
+                </div>
+
+                {/* Inbox dropdown list */}
+                {(selectedTestEmailId === "select" || (selectedTestEmailId !== "latest" && selectedTestEmailId !== "custom")) && (
+                  <div className="space-y-1.5 pt-1">
+                    <select
+                      value={selectedTestEmailId}
+                      onChange={(e) => setSelectedTestEmailId(e.target.value)}
+                      className="w-full text-xs font-medium bg-background border border-border rounded-xl px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                      <option value="latest">Select an email from inbox...</option>
+                      {recentEmails.slice(0, 15).map((em) => (
+                        <option key={em.id} value={em.id}>
+                          {(em.from_contact?.name || em.from_contact?.email || "Sender")}: &ldquo;{em.subject}&rdquo;
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Custom Sample Input Form */}
+                {selectedTestEmailId === "custom" && (
+                  <div className="p-3.5 rounded-2xl border border-border bg-muted/40 space-y-2.5 animate-in fade-in-50">
+                    <div>
+                      <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-wider">
+                        Sender Email / Name
+                      </label>
+                      <input
+                        type="text"
+                        value={customTestSender}
+                        onChange={(e) => setCustomTestSender(e.target.value)}
+                        placeholder="e.g. notifications@github.com"
+                        className="w-full text-xs bg-background border border-border rounded-xl px-3 py-1.5 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-wider">
+                        Subject Line
+                      </label>
+                      <input
+                        type="text"
+                        value={customTestSubject}
+                        onChange={(e) => setCustomTestSubject(e.target.value)}
+                        placeholder="e.g. Action Required: Pull Request Review"
+                        className="w-full text-xs bg-background border border-border rounded-xl px-3 py-1.5 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-wider">
+                        Body Content
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={customTestBody}
+                        onChange={(e) => setCustomTestBody(e.target.value)}
+                        placeholder="Email body text..."
+                        className="w-full text-xs bg-background border border-border rounded-xl p-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Execution Options & Trigger Actions */}
+              <div className="p-4 rounded-2xl border border-border bg-muted/20 space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-foreground">Live Execution Mode</span>
+                    <p className="text-[10px] text-muted-foreground">
+                      {liveExecuteToggle
+                        ? "Real Action: Sends email / tags / stars in Gmail"
+                        : "Dry Run: Safe simulation without modifying mail"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLiveExecuteToggle(!liveExecuteToggle)}
+                    className={cn(
+                      "px-3 py-1 text-xs font-bold rounded-xl border transition cursor-pointer",
+                      liveExecuteToggle
+                        ? "bg-rose-500/10 text-rose-600 border-rose-500/30"
+                        : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                    )}
+                  >
+                    {liveExecuteToggle ? "Live ON" : "Dry Run"}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleRunSimulation}
+                    disabled={simulating}
+                    className="flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                  >
+                    {simulating ? (
+                      <>
+                        <Activity className="h-3.5 w-3.5 animate-spin" />
+                        <span>Evaluating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-3.5 w-3.5 fill-current" />
+                        <span>Run Simulation</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleRunBatchInbox()}
+                    disabled={batchRunning}
+                    className="flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold bg-card hover:bg-muted border border-border text-foreground rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                  >
+                    {batchRunning ? (
+                      <>
+                        <Activity className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                        <span>Scanning...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                        <span>Run on Inbox (20)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Simulation Result Trace */}
+              {simulationResult && (
+                <div className="space-y-3 animate-in fade-in-50 duration-300">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-foreground">Pipeline Execution Trace</h4>
+                    <span
+                      className={cn(
+                        "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                        simulationResult.matched
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-amber-50 text-amber-700 border border-amber-200"
+                      )}
+                    >
+                      {simulationResult.matched ? "Matched Criteria" : "Unmatched"}
+                    </span>
+                  </div>
+
+                  {/* Tested email info */}
+                  {simulationResult.tested_email && (
+                    <div className="p-3 rounded-xl border border-border bg-card text-xs space-y-1">
+                      <div className="flex items-center justify-between text-muted-foreground text-[10px]">
+                        <span>Tested Email</span>
+                        <span className="font-mono">{simulationResult.tested_email.id?.slice(0, 8)}</span>
+                      </div>
+                      <p className="font-bold text-foreground truncate">
+                        {simulationResult.tested_email.subject}
+                      </p>
+                      <p className="text-muted-foreground text-[11px]">
+                        From: {simulationResult.tested_email.sender_name} &lt;{simulationResult.tested_email.sender}&gt;
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Step list */}
+                  <div className="space-y-2">
+                    {simulationResult.steps?.map((step: any, idx: number) => (
+                      <div
+                        key={step.id || idx}
+                        className="p-3 rounded-xl border border-border bg-card space-y-1 text-xs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                "h-2 w-2 rounded-full",
+                                step.status === "completed"
+                                  ? "bg-emerald-500"
+                                  : step.status === "skipped"
+                                  ? "bg-amber-500"
+                                  : "bg-rose-500"
+                              )}
+                            />
+                            <span className="font-bold text-foreground">{step.name}</span>
+                          </div>
+                          <span className="text-[10px] capitalize text-muted-foreground font-mono">
+                            {step.status}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground pl-4">
+                          {step.detail}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Action Preview output */}
+                  {simulationResult.output_preview && (
+                    <div className="p-3.5 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-indigo-600">
+                        <span>Generated Action Output</span>
+                        <span>{simulationResult.action_type?.toUpperCase()}</span>
+                      </div>
+                      <pre className="text-xs text-foreground font-mono whitespace-pre-wrap bg-card/80 p-2.5 rounded-xl border border-border">
+                        {simulationResult.output_preview}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Batch Result */}
+              {batchResult && (
+                <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-3 animate-in fade-in-50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-700">
+                      Batch Inbox Run Completed
+                    </span>
+                    <span className="text-xs font-bold text-emerald-800">
+                      {batchResult.matched_count} / {batchResult.total_scanned} Matched
+                    </span>
+                  </div>
+
+                  {batchResult.results?.length > 0 && (
+                    <div className="space-y-2 pt-1 max-h-48 overflow-y-auto">
+                      {batchResult.results.map((item: any, i: number) => (
+                        <div
+                          key={i}
+                          className="p-2.5 rounded-xl bg-card border border-border text-xs space-y-0.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-foreground truncate max-w-[260px]">
+                              {item.subject}
+                            </span>
+                            <span className="text-[10px] text-emerald-600 font-bold uppercase">
+                              {item.action_type}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">From: {item.sender}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>

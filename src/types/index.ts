@@ -26,6 +26,7 @@ export interface Email {
   has_attachments: boolean;
   attachments: Attachment[];
   thread_id: string | null;
+  in_reply_to?: string | null;
   unsubscribe_link?: string;
   ai_category?: string;
   timestamp: string;
@@ -39,6 +40,13 @@ export interface EmailListResponse {
   has_more: boolean;
 }
 
+export interface EmailThreadResponse {
+  thread_id: string | null;
+  subject: string;
+  count: number;
+  emails: Email[];
+}
+
 export interface EmailCreate {
   to: EmailContact[];
   cc: EmailContact[];
@@ -47,6 +55,8 @@ export interface EmailCreate {
   body: string;
   body_html: string;
   is_draft: boolean;
+  thread_id?: string | null;
+  in_reply_to?: string | null;
 }
 
 export interface EmailUpdate {
@@ -54,6 +64,12 @@ export interface EmailUpdate {
   is_starred?: boolean;
   folder?: string;
   labels?: string[];
+  to?: EmailContact[];
+  cc?: EmailContact[];
+  bcc?: EmailContact[];
+  subject?: string;
+  body?: string;
+  body_html?: string;
 }
 
 export interface UserProfile {
@@ -81,7 +97,13 @@ export type MailFolder =
   | "starred"
   | "sent"
   | "drafts"
-  | "trash";
+  | "trash"
+  | "important"
+  | "purchases"
+  | "subscriptions"
+  | "all_mail"
+  | "scheduled"
+  | "snoozed";
 
 export interface AutomationRule {
   id: string;

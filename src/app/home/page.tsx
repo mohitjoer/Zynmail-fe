@@ -38,7 +38,7 @@ export default function Home() {
         authAttempted.current = true;
         setIsSyncing(true);
         try {
-          const authRes = await fetch('http://localhost:8000/api/auth/google/callback', {
+          const authRes = await fetch('/api/auth/google/callback', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code })
@@ -54,7 +54,7 @@ export default function Home() {
             return;
           }
           
-          const syncRes = await fetch('http://localhost:8000/api/emails/sync', { method: 'POST' });
+          const syncRes = await fetch('/api/emails/sync', { method: 'POST' });
           if (!syncRes.ok) {
              console.error("Sync failed, but auth might have succeeded.");
           }
@@ -83,7 +83,7 @@ export default function Home() {
 
   return (
     <div
-      className="flex flex-col h-screen w-full text-[#1f1f1f] overflow-hidden font-sans bg-[#f8fafc]"
+      className="flex flex-col h-screen w-full text-foreground overflow-hidden font-sans bg-background"
       suppressHydrationWarning
     >
       <Header />
@@ -91,7 +91,7 @@ export default function Home() {
         <Sidebar />
         
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 bg-card overflow-hidden border-l border-border">
           {selectedEmail ? (
             <EmailDetail />
           ) : (
@@ -102,7 +102,7 @@ export default function Home() {
         {/* AI Chat Side Panel */}
         <div
           className={cn(
-            "transition-all duration-300 ease-in-out flex flex-col overflow-hidden h-full shrink-0 border-l border-gray-200 bg-white",
+            "transition-all duration-300 ease-in-out flex flex-col overflow-hidden h-full shrink-0 border-l border-border bg-card",
             isChatOpen ? "w-[380px] lg:w-[420px] opacity-100" : "w-0 opacity-0 pointer-events-none"
           )}
         >

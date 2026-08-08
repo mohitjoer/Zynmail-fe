@@ -20,11 +20,16 @@ interface EmailContextType {
   isLoading: boolean;
   searchQuery: string;
   composeOpen: boolean;
+  draftToEdit: Email | null;
   selectedIds: Set<string>;
   setActiveFolder: (folder: MailFolder) => void;
   setSelectedEmail: (emailOrId: Email | string | null) => void;
   setSearchQuery: (query: string) => void;
   setComposeOpen: (open: boolean) => void;
+  setDraftToEdit: (draft: Email | null) => void;
+  openComposeWithDraft: (draft: Email) => void;
+  openComposeForReply: (email: Email) => void;
+  openComposeForForward: (email: Email) => void;
   toggleSelectEmail: (id: string) => void;
   selectAllEmails: () => void;
   clearSelection: () => void;
@@ -34,8 +39,14 @@ interface EmailContextType {
   deleteEmail: (id: string) => Promise<void>;
   refreshEmails: () => void;
   isConnected: boolean;
+  isGmailConnected: boolean;
+  gmailEmail: string | null;
   connectGmail: () => void;
+  disconnectGmail: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signOut: () => Promise<void>;
   isChatOpen: boolean;
   setIsChatOpen: (open: boolean) => void;
   toggleChat: () => void;
@@ -54,11 +65,76 @@ export function EmailProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
+  const [draftToEdit, setDraftToEdit] = useState<Email | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isInitialized, setIsInitialized] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isGmailConnected, setIsGmailConnected] = useState(false);
+  const [gmailEmail, setGmailEmail] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isAutomationsOpen, setIsAutomationsOpen] = useState(false);
+
+  const openComposeWithDraft = useCallback((draft: Email) => {
+    setDraftToEdit(draft);
+    setComposeOpen(true);
+  }, []);
+
+  const openComposeForReply = useCallback((email: Email) => {
+    const replySubject = email.subject?.toLowerCase().startsWith("re:")
+      ? email.subject
+      : `Re: ${email.subject || ""}`;
+    const senderName = email.from_contact?.name || email.from_contact?.email || "Sender";
+    const quotedBody = `\n\nOn ${new Date(email.timestamp).toLocaleString()}, ${senderName} <${email.from_contact?.email}> wrote:\n> ${(email.body || "").replace(/\n/g, "\n> ")}`;
+    
+    setDraftToEdit({
+      id: "",
+      from_contact: email.from_contact,
+      to: [email.from_contact],
+      cc: [],
+      subject: replySubject,
+      body: quotedBody,
+      body_html: "",
+      snippet: "",
+      folder: "drafts",
+      labels: ["DRAFT"],
+      is_read: true,
+      is_starred: false,
+      has_attachments: false,
+      attachments: [],
+      thread_id: email.thread_id || null,
+      in_reply_to: email.id,
+      timestamp: new Date().toISOString(),
+    });
+    setComposeOpen(true);
+  }, []);
+
+  const openComposeForForward = useCallback((email: Email) => {
+    const forwardSubject = email.subject?.toLowerCase().startsWith("fwd:")
+      ? email.subject
+      : `Fwd: ${email.subject || ""}`;
+    const quotedBody = `\n\n---------- Forwarded message ---------\nFrom: ${email.from_contact?.name} <${email.from_contact?.email}>\nDate: ${new Date(email.timestamp).toLocaleString()}\nSubject: ${email.subject}\nTo: ${(email.to || []).map(t => `${t.name || t.email} <${t.email}>`).join(", ")}\n\n${email.body || ""}`;
+
+    setDraftToEdit({
+      id: "",
+      from_contact: email.from_contact,
+      to: [],
+      cc: [],
+      subject: forwardSubject,
+      body: quotedBody,
+      body_html: "",
+      snippet: "",
+      folder: "drafts",
+      labels: ["DRAFT"],
+      is_read: true,
+      is_starred: false,
+      has_attachments: false,
+      attachments: email.attachments || [],
+      thread_id: email.thread_id || null,
+      in_reply_to: email.id,
+      timestamp: new Date().toISOString(),
+    });
+    setComposeOpen(true);
+  }, []);
 
   const toggleChat = useCallback(() => {
     setIsChatOpen(prev => !prev);
@@ -115,7 +191,7 @@ export function EmailProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       const data = await api.emails.list({
-        folder: activeFolder,
+        folder: activeFolder === 'inbox' ? 'all_mail' : activeFolder,
         search: searchQuery || undefined,
       });
       setEmails(data.emails);
@@ -138,9 +214,11 @@ export function EmailProvider({ children }: { children: ReactNode }) {
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/auth/status');
+      const res = await fetch('/api/auth/status');
       const data = await res.json();
       setIsConnected(data.connected);
+      setIsGmailConnected(!!data.gmail_connected);
+      setGmailEmail(data.gmail_email || null);
       if (data.connected) {
         fetchEmails();
         fetchCounts();
@@ -159,7 +237,17 @@ export function EmailProvider({ children }: { children: ReactNode }) {
     }
   }, [checkAuthStatus, isInitialized]);
 
-  // Background sync every 2 minutes
+  // Automatically re-fetch emails whenever folder or search query changes
+  useEffect(() => {
+    if (!isInitialized || !isConnected) return;
+    const timer = setTimeout(() => {
+      fetchEmails();
+    }, searchQuery ? 250 : 0);
+
+    return () => clearTimeout(timer);
+  }, [activeFolder, searchQuery, isInitialized, isConnected, fetchEmails]);
+
+  // Background sync every 30 seconds
   useEffect(() => {
     if (!isInitialized) return;
     
@@ -317,15 +405,57 @@ export function EmailProvider({ children }: { children: ReactNode }) {
     [activeFolder, deleteEmail, selectedEmail, setSelectedEmail, fetchCounts]
   );
 
-  const refreshEmails = useCallback(() => {
-    if (!isConnected) return;
-    fetchEmails();
-    fetchCounts();
-  }, [fetchEmails, fetchCounts, isConnected]);
+  const signIn = useCallback(async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      const res = await api.auth.signin({ email, password });
+      setIsConnected(true);
+      await fetchEmails();
+      await fetchCounts();
+      return { success: true };
+    } catch (err: any) {
+      console.error("Sign in failed:", err);
+      return { success: false, error: err.message || "Failed to sign in. Please check your credentials." };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchEmails, fetchCounts]);
+
+  const signUp = useCallback(async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      const res = await api.auth.signup({ email, password });
+      setIsConnected(true);
+      await fetchEmails();
+      await fetchCounts();
+      return { success: true };
+    } catch (err: any) {
+      console.error("Sign up failed:", err);
+      return { success: false, error: err.message || "Failed to create account." };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchEmails, fetchCounts]);
+
+  const signOut = useCallback(async () => {
+    try {
+      await api.auth.logout();
+    } catch (err) {
+      console.error("Logout error:", err);
+    } finally {
+      setIsConnected(false);
+      setEmails([]);
+      setSelectedEmailState(null);
+      setFolderCounts({});
+      if (typeof window !== "undefined") {
+        window.location.href = "/signin";
+      }
+    }
+  }, []);
 
   const connectGmail = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/auth/google/url');
+      const res = await fetch('/api/auth/google/url');
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
@@ -335,6 +465,32 @@ export function EmailProvider({ children }: { children: ReactNode }) {
       alert("Failed to connect to Gmail. Ensure the backend is running.");
     }
   }, []);
+
+  const disconnectGmail = useCallback(async () => {
+    try {
+      await api.auth.disconnectGmail();
+      setIsGmailConnected(false);
+      setGmailEmail(null);
+      await checkAuthStatus();
+    } catch (err) {
+      console.error("Failed to disconnect Gmail:", err);
+      throw err;
+    }
+  }, [checkAuthStatus]);
+
+  const refreshEmails = useCallback(async () => {
+    if (!isConnected) {
+      connectGmail();
+      return;
+    }
+    try {
+      await api.emails.sync();
+    } catch (err) {
+      console.error("Manual Gmail sync error:", err);
+    }
+    await fetchEmails();
+    await fetchCounts();
+  }, [fetchEmails, fetchCounts, isConnected, connectGmail]);
 
   return (
     <EmailContext.Provider
@@ -346,11 +502,16 @@ export function EmailProvider({ children }: { children: ReactNode }) {
         isLoading,
         searchQuery,
         composeOpen,
+        draftToEdit,
         selectedIds,
         setActiveFolder,
         setSelectedEmail,
         setSearchQuery,
         setComposeOpen,
+        setDraftToEdit,
+        openComposeWithDraft,
+        openComposeForReply,
+        openComposeForForward,
         toggleSelectEmail,
         selectAllEmails,
         clearSelection,
@@ -360,8 +521,14 @@ export function EmailProvider({ children }: { children: ReactNode }) {
         deleteEmail,
         refreshEmails,
         isConnected,
+        isGmailConnected,
+        gmailEmail,
         connectGmail,
+        disconnectGmail,
         checkAuthStatus,
+        signIn,
+        signUp,
+        signOut,
         isChatOpen,
         setIsChatOpen,
         toggleChat,
