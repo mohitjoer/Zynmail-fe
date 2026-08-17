@@ -25,11 +25,13 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { authClient } from "@/lib/auth-client";
 
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isChatOpen, toggleChat, setComposeOpen, isConnected, connectGmail, refreshEmails } = useEmail();
+  const { isChatOpen, toggleChat, setComposeOpen, isConnected, connectGmail, refreshEmails, gmailEmail } = useEmail();
+  const { data: session } = authClient.useSession();
   const { resolvedTheme, toggleTheme } = useTheme();
   const [user, setUser] = useState<{name: string, email: string, avatar_url: string, signature: string} | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -171,7 +173,7 @@ export default function Header() {
               <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent hover:ring-border transition-all">
                 {user?.avatar_url && <AvatarImage src={user.avatar_url} alt={user.name} referrerPolicy="no-referrer" />}
                 <AvatarFallback className="bg-blue-600 text-white text-sm font-medium">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : "Y"}
+                  {(session?.user?.name || user?.name || gmailEmail || "U").charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
@@ -179,7 +181,8 @@ export default function Header() {
               <DropdownMenuGroup>
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.name || 'My Account'}</p>
+                    <p className="text-sm font-semibold leading-none truncate">{session?.user?.name || user?.name || 'My Account'}</p>
+                    <p className="text-xs text-muted-foreground leading-none truncate">{gmailEmail || session?.user?.email || user?.email || ''}</p>
                   </div>
                 </DropdownMenuLabel>
               </DropdownMenuGroup>

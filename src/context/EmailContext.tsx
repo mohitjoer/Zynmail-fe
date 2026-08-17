@@ -11,6 +11,7 @@ import {
 import type { Email, FolderCounts, MailFolder } from "@/types";
 import { api } from "@/lib/api";
 import { useEmailCache } from "@/store/emailCache";
+import { authClient } from "@/lib/auth-client";
 
 interface EmailContextType {
   emails: Email[];
@@ -214,12 +215,27 @@ export function EmailProvider({ children }: { children: ReactNode }) {
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/status');
-      const data = await res.json();
-      setIsConnected(data.connected);
-      setIsGmailConnected(!!data.gmail_connected);
-      setGmailEmail(data.gmail_email || null);
-      if (data.connected) {
+      const session = await authClient.getSession();
+      const user = session?.data?.user;
+      const isAuth = !!user;
+      setIsConnected(isAuth);
+      
+      try {
+        const res = await fetch('/api/auth/status');
+        if (res.ok) {
+          const data = await res.json();
+          setIsGmailConnected(!!data.gmail_connected);
+          setGmailEmail(data.gmail_email || user?.email || null);
+        } else if (user) {
+          setGmailEmail(user.email || null);
+        }
+      } catch {
+        if (user) {
+          setGmailEmail(user.email || null);
+        }
+      }
+
+      if (isAuth) {
         fetchEmails();
         fetchCounts();
       } else {
@@ -408,14 +424,21 @@ export function EmailProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      const res = await api.auth.signin({ email, password });
+      const res = await authClient.signIn.email({
+        email,
+        password,
+      });
+      if (res.error) {
+        return { success: false, error: res.error.message || "Invalid email or password." };
+      }
       setIsConnected(true);
       await fetchEmails();
       await fetchCounts();
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Sign in failed:", err);
-      return { success: false, error: err.message || "Failed to sign in. Please check your credentials." };
+      const msg = err instanceof Error ? err.message : "Failed to sign in. Please check your credentials.";
+      return { success: false, error: msg };
     } finally {
       setIsLoading(false);
     }
@@ -424,14 +447,23 @@ export function EmailProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      const res = await api.auth.signup({ email, password });
+      const name = email.split("@")[0] || "User";
+      const res = await authClient.signUp.email({
+        email,
+        password,
+        name,
+      });
+      if (res.error) {
+        return { success: false, error: res.error.message || "Failed to create account." };
+      }
       setIsConnected(true);
       await fetchEmails();
       await fetchCounts();
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Sign up failed:", err);
-      return { success: false, error: err.message || "Failed to create account." };
+      const msg = err instanceof Error ? err.message : "Failed to create account.";
+      return { success: false, error: msg };
     } finally {
       setIsLoading(false);
     }
@@ -439,7 +471,10 @@ export function EmailProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      await api.auth.logout();
+      await authClient.signOut();
+      try {
+        await api.auth.logout();
+      } catch {}
     } catch (err) {
       console.error("Logout error:", err);
     } finally {

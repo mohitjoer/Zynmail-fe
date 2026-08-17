@@ -41,6 +41,7 @@ import {
   Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
 
 type SettingsTab = "profile" | "gmail" | "security" | "safety" | "preferences";
 
@@ -117,6 +118,8 @@ export default function SettingsPage() {
   const [strictSandbox, setStrictSandbox] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
 
+  const { data: session } = authClient.useSession();
+
   // Load user profile
   useEffect(() => {
     let isMounted = true;
@@ -124,13 +127,22 @@ export default function SettingsPage() {
       try {
         const user = await api.user.get();
         if (isMounted && user) {
-          setProfileName(user.name || "");
-          setProfileEmail(user.email || "");
-          setProfileAvatar(user.avatar_url || "");
+          setProfileName(user.name || session?.user?.name || "User");
+          setProfileEmail(gmailEmail || session?.user?.email || user.email || "");
+          setProfileAvatar(user.avatar_url || session?.user?.image || "");
           setAvatarError(false);
           if (user.signature) setProfileSignature(user.signature);
+        } else if (isMounted && session?.user) {
+          setProfileName(session.user.name || "User");
+          setProfileEmail(gmailEmail || session.user.email || "");
+          setProfileAvatar(session.user.image || "");
         }
       } catch (err) {
+        if (isMounted && session?.user) {
+          setProfileName(session.user.name || "User");
+          setProfileEmail(gmailEmail || session.user.email || "");
+          setProfileAvatar(session.user.image || "");
+        }
         console.debug("Failed to load user profile:", err);
       }
     };
@@ -138,7 +150,7 @@ export default function SettingsPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [session, gmailEmail]);
 
   // Fetch security status
   const fetchSecurityStatus = useCallback(async () => {

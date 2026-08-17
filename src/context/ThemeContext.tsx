@@ -21,8 +21,8 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<ThemeMode>("light");
-  const [resolvedTheme, setResolvedTheme] = useState<ThemeMode>("light");
+  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [resolvedTheme, setResolvedTheme] = useState<ThemeMode>("dark");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -32,12 +32,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setTheme(saved);
       setResolvedTheme(saved);
     } else {
-      const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      ).matches;
-      const initial = prefersDark ? "dark" : "light";
-      setTheme(initial);
-      setResolvedTheme(initial);
+      setTheme("dark");
+      setResolvedTheme("dark");
     }
   }, []);
 
@@ -62,7 +58,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     <ThemeContext.Provider
       value={{
         theme,
-        resolvedTheme: mounted ? resolvedTheme : "light",
+        resolvedTheme: mounted ? resolvedTheme : "dark",
         toggleTheme,
         setTheme: setThemeDirect,
       }}
